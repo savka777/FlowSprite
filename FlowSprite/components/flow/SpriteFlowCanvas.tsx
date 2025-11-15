@@ -14,6 +14,7 @@ import ReactFlow, {
   EdgeChange,
   applyNodeChanges,
   applyEdgeChanges,
+  ResizeControl,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { ReferenceNode } from "./nodes/ReferenceNode";
@@ -21,6 +22,8 @@ import { PromptNode } from "./nodes/PromptNode";
 import { PreviewNode } from "./nodes/PreviewNode";
 import { AnimationNode } from "./nodes/AnimationNode";
 import { AnimationPreviewNode } from "./nodes/AnimationPreviewNode";
+import { CutNode } from "./nodes/CutNode";
+import { SpriteFramesPreviewNode } from "./nodes/SpriteFramesPreviewNode";
 import { SpriteNodeData } from "@/lib/flowTypes";
 
 const nodeTypes: NodeTypes = {
@@ -29,6 +32,8 @@ const nodeTypes: NodeTypes = {
   preview: PreviewNode,
   animation: AnimationNode,
   animationPreview: AnimationPreviewNode,
+  cut: CutNode,
+  spriteFramesPreview: SpriteFramesPreviewNode,
 };
 
 interface SpriteFlowCanvasProps {
@@ -60,6 +65,10 @@ export function SpriteFlowCanvas({
     return nodes.map((node) => {
       const nodeData = { ...node.data };
       
+      // Enable resizing for nodes that display content (preview, animationPreview, spriteFramesPreview)
+      const resizableTypes = ["preview", "animationPreview", "spriteFramesPreview", "reference"];
+      const isResizable = resizableTypes.includes(nodeData.type);
+      
       // Add onRegenerate for preview and animationPreview nodes if not already set
       if (
         (nodeData.type === "preview" || nodeData.type === "animationPreview") &&
@@ -67,6 +76,7 @@ export function SpriteFlowCanvas({
       ) {
         return {
           ...node,
+          resizable: isResizable,
           data: {
             ...nodeData,
             onRegenerate,
@@ -74,7 +84,10 @@ export function SpriteFlowCanvas({
         };
       }
       
-      return node;
+      return {
+        ...node,
+        resizable: isResizable,
+      };
     });
   }, [nodes, onRegenerate]);
 
@@ -113,7 +126,23 @@ export function SpriteFlowCanvas({
       >
         <Background />
         <Controls />
-        <MiniMap />
+        <MiniMap 
+          style={{
+            width: 120,
+            height: 80,
+          }}
+          nodeColor={(node) => {
+            const nodeData = node.data as any;
+            if (nodeData.type === "reference") return "#4C97FF";
+            if (nodeData.type === "prompt") return "#4CBF4F";
+            if (nodeData.type === "preview") return "#9966FF";
+            if (nodeData.type === "animation") return "#FF8C1A";
+            if (nodeData.type === "animationPreview") return "#FF6680";
+            if (nodeData.type === "cut") return "#1ABC9C";
+            if (nodeData.type === "spriteFramesPreview") return "#3498DB";
+            return "#E5E7EB";
+          }}
+        />
       </ReactFlow>
     </div>
   );
@@ -124,7 +153,7 @@ export function SpriteFlowCanvas({
 export function getGraphState(nodes: Node[], edges: Edge[]) {
   return {
     nodes: nodes.map((node) => {
-      const { onUpdate, onRegenerate, onDelete, onPlay, onGenerateAnimation, hasIncomingEdges, isConnectedToPromptOrReference, isConnectedToPreview, ...serializableData } = node.data as any;
+      const { onUpdate, onRegenerate, onDelete, onPlay, onGenerateAnimation, onCutFrames, hasIncomingEdges, isConnectedToPromptOrReference, isConnectedToPreview, ...serializableData } = node.data as any;
       return {
         id: node.id,
         type: node.type,

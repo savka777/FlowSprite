@@ -4,7 +4,7 @@ import React, { useCallback } from "react";
 import { SpriteFlowCanvas, getGraphState } from "./flow/SpriteFlowCanvas";
 import { Node, Edge, NodeChange, EdgeChange, Connection, addEdge, applyNodeChanges, applyEdgeChanges } from "reactflow";
 import { SpriteNodeData, AnimationKind, NodeStatus } from "@/lib/flowTypes";
-import { ImageIcon, Type, Eye, Film, Video } from "lucide-react";
+import { ImageIcon, Type, Eye, Film, Video, Scissors, Grid3x3 } from "lucide-react";
 
 const initialNodes: Node<SpriteNodeData>[] = [
   {
@@ -77,6 +77,12 @@ export function SpriteFlowPage() {
       case "animationPreview":
         nodeData = { type: "animationPreview", status: "idle" };
         break;
+      case "cut":
+        nodeData = { type: "cut", label: "Cut to Sprites", status: "idle" };
+        break;
+      case "spriteFramesPreview":
+        nodeData = { type: "spriteFramesPreview", label: "Sprite Frames Preview", status: "idle" };
+        break;
       default:
         return;
     }
@@ -91,10 +97,94 @@ export function SpriteFlowPage() {
     setNodes((prev) => [...prev, newNode]);
   }, []);
 
-  const handleExport = useCallback(() => {
-    const graphState = getGraphState(nodes, edges);
-    console.log("Exporting graph:", JSON.stringify(graphState, null, 2));
-    // TODO: Replace with API call to backend
+  const handleExport = useCallback(async () => {
+    try {
+      // Import JSZip dynamically (it's a large library)
+      const JSZip = (await import("jszip")).default;
+
+      const zip = new JSZip();
+      let hasContent = false;
+
+      // Collect all Preview nodes with generated sprites
+      const previewNodes = nodes.filter(
+        (n) => n.data.type === "preview" && n.data.imageUrl && n.data.status === "ready"
+      );
+
+      if (previewNodes.length > 0) {
+        const characterFolder = zip.folder("character");
+        if (characterFolder) {
+          previewNodes.forEach((node, index) => {
+            if (node.data.type === "preview" && node.data.imageUrl) {
+              // Extract base64 from data URL
+              const dataUrl = node.data.imageUrl;
+              const base64Match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+              if (base64Match) {
+                const mimeType = base64Match[1];
+                const base64 = base64Match[2];
+                const extension = mimeType.includes("png") ? "png" : mimeType.includes("jpeg") ? "jpg" : "png";
+                const filename = previewNodes.length === 1 
+                  ? `sprite.${extension}` 
+                  : `sprite_${index + 1}.${extension}`;
+                
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length)
+                  .fill(0)
+                  .map((_, i) => byteCharacters.charCodeAt(i));
+                const byteArray = new Uint8Array(byteNumbers);
+                
+                characterFolder.file(filename, byteArray);
+                hasContent = true;
+              }
+            }
+          });
+        }
+      }
+
+      // Collect all Cut nodes with frames
+      const cutNodes = nodes.filter(
+        (n) => n.data.type === "cut" && n.data.frames && n.data.frames.length > 0 && n.data.status === "ready"
+      );
+
+      if (cutNodes.length > 0) {
+        cutNodes.forEach((cutNode, cutIndex) => {
+          if (cutNode.data.type === "cut" && cutNode.data.frames) {
+            const framesFolder = zip.folder(
+              cutNodes.length === 1 ? "frames" : `frames_${cutIndex + 1}`
+            );
+            if (framesFolder) {
+              cutNode.data.frames.forEach((frame) => {
+                const byteCharacters = atob(frame.base64);
+                const byteNumbers = new Array(byteCharacters.length)
+                  .fill(0)
+                  .map((_, i) => byteCharacters.charCodeAt(i));
+                const byteArray = new Uint8Array(byteNumbers);
+                framesFolder.file(frame.filename, byteArray);
+                hasContent = true;
+              });
+            }
+          }
+        });
+      }
+
+      if (!hasContent) {
+        alert("No sprites or frames to export. Please generate at least one sprite or cut frames first.");
+        return;
+      }
+
+      // Generate and download ZIP
+      const zipBuffer = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBuffer);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `spriteflow_export_${new Date().toISOString().split("T")[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting:", error);
+      alert("Failed to export. Please try again.");
+    }
   }, [nodes, edges]);
 
   const handleRegenerate = useCallback(
@@ -466,6 +556,137 @@ export function SpriteFlowPage() {
     [nodes, edges]
   );
 
+  const handleCutFrames = useCallback(
+    async (nodeId: string) => {
+      console.log("Cutting frames for node:", nodeId);
+
+      // Update status to cutting
+      setNodes((prev) =>
+        prev.map((node) =>
+          node.id === nodeId && node.type === "cut"
+            ? {
+                ...node,
+                data: {
+                  ...(node.data as any),
+                  status: "cutting" as NodeStatus,
+                  errorMessage: undefined,
+                },
+              }
+            : node
+        )
+      );
+
+      const cutNode = nodes.find((n) => n.id === nodeId);
+      if (!cutNode) return;
+
+      // Find connected animation node or animationPreview node
+      const incoming = edges.filter((e) => e.target === nodeId);
+      const sourceIds = incoming.map((e) => e.source);
+      
+      // Try to find Animation node first
+      let sourceNode = nodes.find(
+        (n) => sourceIds.includes(n.id) && n.data.type === "animation"
+      );
+      
+      // If not found, try AnimationPreview node
+      if (!sourceNode) {
+        sourceNode = nodes.find(
+          (n) => sourceIds.includes(n.id) && n.data.type === "animationPreview"
+        );
+      }
+
+      // Check if we have a valid source node with video
+      let videoBase64: string | undefined;
+      if (sourceNode) {
+        if (sourceNode.data.type === "animation" && sourceNode.data.videoBase64) {
+          videoBase64 = sourceNode.data.videoBase64;
+        } else if (sourceNode.data.type === "animationPreview" && sourceNode.data.videoBase64) {
+          videoBase64 = sourceNode.data.videoBase64;
+        }
+      }
+
+      if (!videoBase64) {
+        setNodes((prev) =>
+          prev.map((node) =>
+            node.id === nodeId
+              ? {
+                  ...node,
+                  data: {
+                    ...(node.data as any),
+                    status: "error" as NodeStatus,
+                    errorMessage: "No animation video connected.",
+                  },
+                }
+              : node
+          )
+        );
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/cut-frames", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nodeId, videoBase64 }),
+        });
+
+        const json = await res.json();
+
+        if (!res.ok || !json.frames) {
+          throw new Error(json.error || "Failed to cut frames");
+        }
+
+        setNodes((prev) =>
+          prev.map((node) => {
+            if (node.id === nodeId && node.type === "cut") {
+              return {
+                ...node,
+                data: {
+                  ...(node.data as any),
+                  status: "ready" as NodeStatus,
+                  frames: json.frames,
+                  zipBase64: json.zipBase64,
+                },
+              };
+            }
+            // Also update connected spriteFramesPreview nodes
+            if (
+              node.type === "spriteFramesPreview" &&
+              edges.some((e) => e.source === nodeId && e.target === node.id)
+            ) {
+              return {
+                ...node,
+                data: {
+                  ...(node.data as any),
+                  status: "ready" as NodeStatus,
+                  frames: json.frames,
+                },
+              };
+            }
+            return node;
+          })
+        );
+      } catch (err: any) {
+        console.error("Error cutting frames:", err);
+        setNodes((prev) =>
+          prev.map((node) =>
+            node.id === nodeId && node.type === "cut"
+              ? {
+                  ...node,
+                  data: {
+                    ...(node.data as any),
+                    status: "error" as NodeStatus,
+                    errorMessage: err?.message || "Failed to cut frames",
+                  },
+                }
+              : node
+          )
+        );
+      }
+    },
+    [nodes, edges]
+  );
+
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   }, []);
@@ -604,6 +825,25 @@ export function SpriteFlowPage() {
           },
         };
       }
+      if (node.data.type === "cut") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onDelete: () => handleDeleteNode(node.id),
+            onCutFrames: () => handleCutFrames(node.id),
+          },
+        };
+      }
+      if (node.data.type === "spriteFramesPreview") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onDelete: () => handleDeleteNode(node.id),
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -612,7 +852,7 @@ export function SpriteFlowPage() {
         },
       };
     });
-  }, [nodes, edges, setNodes, handleDeleteNode, handlePlay, handleGenerateAnimation]);
+  }, [nodes, edges, setNodes, handleDeleteNode, handlePlay, handleGenerateAnimation, handleCutFrames]);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
@@ -718,6 +958,23 @@ export function SpriteFlowPage() {
               >
                 <Video className="w-4 h-4" />
                 Animation Preview
+              </button>
+            </div>
+            <div className="pt-2 border-t border-gray-200 mt-2">
+              <p className="text-xs text-gray-500 mb-2 px-2">Frame Extraction</p>
+              <button
+                onClick={() => handleAddNode("cut")}
+                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
+              >
+                <Scissors className="w-4 h-4" />
+                Cut to Sprites
+              </button>
+              <button
+                onClick={() => handleAddNode("spriteFramesPreview")}
+                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
+              >
+                <Grid3x3 className="w-4 h-4" />
+                Sprite Frames Preview
               </button>
             </div>
           </div>

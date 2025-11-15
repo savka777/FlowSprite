@@ -1,4 +1,4 @@
-export type NodeStatus = 'idle' | 'generating' | 'ready' | 'error';
+export type NodeStatus = 'idle' | 'generating' | 'ready' | 'error' | 'cutting';
 
 export type AnimationKind = 'idle' | 'walk' | 'run' | 'jump';
 
@@ -58,17 +58,47 @@ export interface AnimationPreviewNodeData {
   onGenerateAnimation?: (animationNodeId: string) => void;
 }
 
+export interface CutFrame {
+  index: number;
+  filename: string;
+  base64: string; // PNG as base64, no data: prefix
+}
+
+export interface CutNodeData {
+  type: 'cut';
+  label: string;
+  status: NodeStatus;
+  frames?: CutFrame[];
+  zipBase64?: string; // zip containing all frames
+  errorMessage?: string;
+  onCutFrames?: (nodeId: string) => void;
+  onDelete?: () => void;
+}
+
+export interface SpriteFramesPreviewNodeData {
+  type: 'spriteFramesPreview';
+  label: string;
+  status: NodeStatus;
+  frames?: CutFrame[];
+  errorMessage?: string;
+  onDelete?: () => void;
+}
+
 export type SpriteNodeData =
   | ReferenceNodeData
   | PromptNodeData
   | PreviewNodeData
   | AnimationNodeData
-  | AnimationPreviewNodeData;
+  | AnimationPreviewNodeData
+  | CutNodeData
+  | SpriteFramesPreviewNodeData;
 
 export type SpriteNodeType =
   | 'reference'
   | 'prompt'
   | 'preview'
   | 'animation'
-  | 'animationPreview';
+  | 'animationPreview'
+  | 'cut'
+  | 'spriteFramesPreview';
 

@@ -9,6 +9,8 @@ import { Loader2, Play } from "lucide-react";
 export function AnimationPreviewNode({
   id,
   data,
+  width,
+  height,
 }: NodeProps<AnimationPreviewNodeData>) {
   const handleRegenerate = () => {
     if (data.onRegenerate) {
@@ -43,6 +45,7 @@ export function AnimationPreviewNode({
   return (
     <>
       <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
       <SpriteNodeWrapper
         title="Animation Preview"
         status={data.status}
@@ -51,6 +54,8 @@ export function AnimationPreviewNode({
         showDelete={true}
         onDelete={handleDelete}
         borderColor="#FF6680" // Scratch pink
+        width={width}
+        height={height}
       >
         <div className="space-y-2">
           <div className="border border-gray-300 rounded-lg bg-white w-full h-40 flex items-center justify-center overflow-hidden">
