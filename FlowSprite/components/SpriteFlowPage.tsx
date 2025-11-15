@@ -149,6 +149,25 @@ export function SpriteFlowPage() {
           }
         }
 
+        // Extract images from connected Preview nodes (use generated sprites as context)
+        const previewNodes = connectedNodes.filter((n) => n.data.type === "preview");
+        for (const previewNode of previewNodes) {
+          if (previewNode.data.type === "preview" && previewNode.data.imageUrl) {
+            // Convert data URL to base64
+            // imageUrl format: "data:image/png;base64,<base64data>"
+            const dataUrl = previewNode.data.imageUrl;
+            const base64Match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (base64Match) {
+              const mimeType = base64Match[1] || "image/png";
+              const base64 = base64Match[2];
+              references.push({
+                mimeType,
+                base64,
+              });
+            }
+          }
+        }
+
         // Generate seed from nodeId for determinism
         let seed = 0;
         for (let i = 0; i < nodeId.length; i++) {
@@ -275,7 +294,8 @@ export function SpriteFlowPage() {
         .map((edge) => edge.source);
       const connectedNodes = nodes.filter((n) => incomingSources.includes(n.id));
       const isConnectedToPromptOrReference = connectedNodes.some(
-        (n) => n.data.type === "prompt" || n.data.type === "reference"
+        (n) => n.data.type === "prompt" || n.data.type === "reference" || 
+              (n.data.type === "preview" && n.data.imageUrl) // Preview nodes with generated images
       );
 
       if (node.data.type === "reference") {

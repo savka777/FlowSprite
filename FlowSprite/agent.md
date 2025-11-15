@@ -1,7 +1,7 @@
 # Agent Guide - SpriteFlow Project
 
 > **Last Updated**: December 2024  
-> **Project Status**: Frontend Complete - Backend Integration Pending
+> **Project Status**: Image Generation Integrated - Animation Generation Pending
 
 ## 🎯 Project Overview
 
@@ -12,7 +12,9 @@
 - **5 Node Types**: Reference, Prompt, Preview, Animation, AnimationPreview
 - **Fullscreen Layout**: Left sidebar (palette), center canvas, right sidebar (inspector)
 - **Node Management**: Add, delete, connect, and configure nodes
+- **AI Image Generation**: Google Gemini API integration for 2D sprite generation
 - **Preview System**: Generate and regenerate sprites with play button when connected
+- **Context-Aware Generation**: Automatically uses connected Prompt and Reference nodes
 
 ---
 
@@ -33,18 +35,38 @@
    - Triggers `handlePlay` callback for preview generation
    - Only shows when connected to valid source nodes (prompt/reference)
 
-3. **Code Improvements**
+3. **Google Gemini Image Generation Integration** ⭐ **NEW**
+   - **API Route**: Created `app/api/preview/route.ts` with Gemini API integration
+   - **Model Selection**: Automatically detects and uses `gemini-2.5-flash-image` models
+   - **Reference Image Support**: Reference nodes store base64 data for API calls
+   - **Context Gathering**: Automatically collects prompt text and reference images from connected nodes
+   - **Image Generation**: Uses Gemini 2.5 Flash Image model for sprite generation
+   - **Prompt Engineering**: Optimized prompts for 2D pixel art sprites (not 3D)
+   - **Error Handling**: Comprehensive error handling for quota, model not found, etc.
+   - **Model Discovery**: Automatic model listing to find available image generation models
+
+4. **UI Improvements**
+   - **Preview Node Size**: Scaled down from `aspect-square` to `h-36` (144px) to match other nodes
+   - **White Background**: Changed from gray/transparent checkerboard to solid white background
+   - **Loading States**: Added spinner and "Generating..." message during API calls
+   - **Error Display**: Better error messages in the UI
+
+5. **Code Improvements**
    - Updated TypeScript types to include new callbacks (`onDelete`, `onPlay`)
    - Enhanced `getGraphState` to filter out callback functions during serialization
    - Added consistent button styling and hover effects
    - Improved event handling with proper propagation control
+   - Added base64 image storage in ReferenceNode for API calls
 
 ### 📁 Files Modified
 - `components/flow/nodes/SpriteNodeWrapper.tsx` - Added delete and play button support
-- `components/SpriteFlowPage.tsx` - Added delete and play handlers, edge detection logic
+- `components/SpriteFlowPage.tsx` - Added delete and play handlers, edge detection logic, Gemini API integration
 - `components/flow/SpriteFlowCanvas.tsx` - Updated props, improved callback handling
-- `lib/flowTypes.ts` - Added new callback types
-- All node components - Added delete button support
+- `components/flow/nodes/PreviewNode.tsx` - Updated size, white background, loading states
+- `components/flow/nodes/ReferenceNode.tsx` - Added base64 encoding for API calls
+- `lib/flowTypes.ts` - Added new callback types, base64 fields
+- `app/api/preview/route.ts` - **NEW** Gemini API integration for image generation
+- `package.json` - Added `@google/generative-ai` dependency
 
 ---
 
@@ -145,44 +167,43 @@ Shared wrapper component for all nodes providing:
 
 ---
 
-## 🔌 Backend Integration Points (TODOs)
+## 🔌 Backend Integration Points
 
-### 1. Reference Node Image Upload
-**File**: `components/flow/nodes/ReferenceNode.tsx:14`
-```typescript
-// TODO: Upload to backend and get imageUrl
-const imageUrl = URL.createObjectURL(file);
-```
-**Action Needed**: Replace with API call to upload image and receive backend URL
+### ✅ Completed
 
-### 2. Export Functionality
-**File**: `components/SpriteFlowPage.tsx:96`
-```typescript
-// TODO: Replace with API call to backend
-console.log("Exporting graph:", JSON.stringify(graphState, null, 2));
-```
-**Action Needed**: Send graph state to backend API to generate spritesheet and metadata
+1. **Image Generation API** ✅
+   - **File**: `app/api/preview/route.ts`
+   - **Status**: Fully implemented
+   - **Model**: Uses `gemini-2.5-flash-image` (automatically detected)
+   - **Features**:
+     - Accepts prompt text and reference images
+     - Generates 2D pixel art sprites
+     - Returns base64 image data
+     - Comprehensive error handling
 
-### 3. Regenerate Callback
-**File**: `components/SpriteFlowPage.tsx:101`
-```typescript
-// TODO: Call backend API to regenerate sprite/animation
-```
-**Action Needed**: 
-- Call backend API with node ID and context
-- Update node status based on API response
-- Set `imageUrl` when generation completes
+2. **Reference Node Base64 Encoding** ✅
+   - **File**: `components/flow/nodes/ReferenceNode.tsx`
+   - **Status**: Implemented
+   - Stores both `imageUrl` (for preview) and `imageBase64` (for API)
 
-### 4. Play/Generate Preview
-**File**: `components/SpriteFlowPage.tsx:136`
-```typescript
-// TODO: Call backend API to generate preview
-```
-**Action Needed**:
-- Collect connected prompt/reference data
-- Send to backend API for sprite generation
-- Update preview node with generated image URL
-- Handle status updates (generating → ready/error)
+3. **Preview Generation Flow** ✅
+   - **File**: `components/SpriteFlowPage.tsx` - `handleRegenerate`
+   - **Status**: Fully implemented
+   - Gathers context from connected Prompt/Reference nodes
+   - Calls `/api/preview` endpoint
+   - Updates node status and displays generated image
+
+### ⚠️ Remaining TODOs
+
+1. **Export Functionality**
+   - **File**: `components/SpriteFlowPage.tsx:96`
+   - **Current**: Logs graph state to console
+   - **Action Needed**: Send graph state to backend API to generate spritesheet and metadata
+
+2. **Animation Generation**
+   - **Status**: Not yet implemented
+   - **Action Needed**: Similar to preview generation but for animation sequences
+   - Can follow the same pattern as preview generation
 
 ---
 
@@ -257,17 +278,21 @@ console.log("Exporting graph:", JSON.stringify(graphState, null, 2));
 - ✅ Connect nodes via drag-and-drop
 - ✅ Delete nodes (removes connected edges automatically)
 - ✅ Edit prompt text
-- ✅ Upload reference images (local preview)
+- ✅ Upload reference images (with base64 encoding for API)
 - ✅ Play button appears when Preview connected to Prompt/Reference
 - ✅ Regenerate button for preview nodes
+- ✅ **AI Image Generation**: Generate 2D pixel art sprites using Gemini API
+- ✅ **Context Gathering**: Automatically collects prompt and reference images from connected nodes
+- ✅ **Status Management**: Visual feedback during generation (spinner, error states)
 - ✅ Node selection and inspector panel
 - ✅ Export graph state (logs to console)
 
-### ⚠️ Frontend Only (Backend Needed)
-- ⚠️ Image upload to backend
-- ⚠️ Sprite generation API calls
-- ⚠️ Animation generation API calls
-- ⚠️ Export functionality (backend processing)
+### ✅ Backend Integration Status
+- ✅ **Image Generation**: Fully integrated with Google Gemini API
+- ✅ **Reference Image Upload**: Base64 encoding for API calls
+- ✅ **Prompt + Reference Context**: Automatically gathered from connected nodes
+- ⚠️ Animation generation API calls (not yet implemented)
+- ⚠️ Export functionality (backend processing - currently logs to console)
 
 ### 🎯 Node Status Flow
 ```
@@ -285,11 +310,17 @@ idle → generating → ready/error
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
+- Google Gemini API Key (for image generation)
 
 ### Setup
 ```bash
 npm install
-npm run dev
+```
+
+### Environment Setup
+Create `.env.local` file in the project root:
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### Key Commands
@@ -298,11 +329,23 @@ npm run dev
 - `npm start` - Start production server
 
 ### Development Workflow
-1. Make changes to components
-2. Hot reload will update automatically
-3. Check browser console for any errors
-4. Test node interactions (add, delete, connect)
-5. Verify play button appears when Preview connected
+1. Set up `.env.local` with `GEMINI_API_KEY`
+2. Run `npm run dev`
+3. Make changes to components
+4. Hot reload will update automatically
+5. Check browser console for frontend errors
+6. Check server console for API errors and model listings
+7. Test node interactions (add, delete, connect)
+8. Test image generation by connecting Prompt/Reference to Preview and clicking regenerate
+
+### Testing Image Generation
+1. Add a Prompt node with text description
+2. Optionally add a Reference node with an image
+3. Add a Preview node
+4. Connect Prompt/Reference to Preview
+5. Click the regenerate button (circular arrow) or play button
+6. Wait for generation (shows spinner)
+7. Generated sprite should appear with white background
 
 ---
 
@@ -315,36 +358,66 @@ npm run dev
 - **`components/flow/nodes/SpriteNodeWrapper.tsx`**: Shared UI wrapper for all nodes
 
 ### Node Components
-- **`ReferenceNode.tsx`**: Image upload (TODO: backend integration)
+- **`ReferenceNode.tsx`**: Image upload with base64 encoding for API
 - **`PromptNode.tsx`**: Text input with `onUpdate` callback
-- **`PreviewNode.tsx`**: Preview with play/regenerate/delete buttons
+- **`PreviewNode.tsx`**: Preview with play/regenerate/delete buttons, image display
 - **`AnimationNode.tsx`**: Animation configuration
 - **`AnimationPreviewNode.tsx`**: Animation preview with regenerate
+
+### API Routes
+- **`app/api/preview/route.ts`**: Gemini API integration for sprite image generation
+  - Model selection (auto-detects `gemini-2.5-flash-image`)
+  - Prompt engineering for 2D pixel art
+  - Reference image support
+  - Error handling
 
 ---
 
 ## 💡 Tips for Future Agents
 
-1. **When adding backend integration**:
-   - Start with Reference node upload (simplest)
-   - Then Preview generation (most important)
-   - Finally Export functionality
+1. **Image Generation**:
+   - Uses `gemini-2.5-flash-image` model (automatically detected)
+   - Model selection happens in `app/api/preview/route.ts`
+   - Prompt engineering is critical - see current prompt for 2D sprite style
+   - Reference images are sent as base64 `inlineData` parts
+   - Generated images are returned as base64 and converted to data URLs
 
-2. **Testing node connections**:
+2. **Model Selection**:
+   - Code automatically lists available models on each request (for debugging)
+   - Prefers `gemini-2.5-flash-image` models (support `generateContent`)
+   - Imagen models exist but use `predict` method (different API structure)
+   - Check console logs to see which models are available
+
+3. **Prompt Engineering**:
+   - **Location**: `app/api/preview/route.ts` - `baseInstructions` variable
+   - **Current Prompt Strategy**:
+     - Emphasizes: "flat 2D pixel art, NOT 3D, NOT photorealistic, NOT rendered"
+     - Negative prompts: "no shadows, no 3D effects, no depth, no gradients"
+     - References: "classic video game sprite style", "2D sprite sheet style"
+     - Background: "white solid background (not transparent, not checkerboard)"
+   - **If images look too 3D**: 
+     - Strengthen negative prompts
+     - Add more pixel art references (e.g., "8-bit", "16-bit", "retro game sprite")
+     - Consider adjusting temperature (currently 0.4)
+   - **Prompt Structure**: User prompt + base instructions combined
+
+4. **Testing node connections**:
    - Preview node needs incoming edge from Prompt or Reference
    - Play button visibility depends on edge connections
    - Use React DevTools to inspect node data
 
-3. **Debugging**:
+5. **Debugging**:
    - Check `nodesWithCallbacks` memo dependencies
    - Verify callbacks are being passed correctly
-   - Use console.log in handlers to trace execution
+   - Check server console for model listing and API errors
+   - Use browser console for frontend errors
 
-4. **Performance**:
+6. **Performance**:
    - `nodesWithCallbacks` memo prevents unnecessary re-renders
    - Edge detection runs on every nodes/edges change (acceptable for small graphs)
+   - Model listing happens on each request (consider caching if needed)
 
-5. **Type Safety**:
+7. **Type Safety**:
    - All node data types are in `flowTypes.ts`
    - Use TypeScript's discriminated unions for type narrowing
    - Check `node.data.type` before accessing type-specific properties
@@ -358,17 +431,21 @@ npm run dev
 - **TypeScript**: Type safety
 - **Tailwind CSS**: Styling
 - **lucide-react**: Icons
+- **@google/generative-ai**: Google Gemini API SDK for image generation
 
 ---
 
 ## 🐛 Known Issues / Future Improvements
 
-1. **No backend integration** - All API calls are stubbed
-2. **No error handling** - API failures not handled
-3. **No loading states** - Status changes but no visual feedback during generation
+1. ✅ **Backend integration** - Image generation fully implemented with Gemini API
+2. ✅ **Error handling** - Comprehensive error handling for API failures, quota limits, model not found
+3. ✅ **Loading states** - Visual feedback with spinner during generation
 4. **No undo/redo** - Node deletion is permanent
 5. **No save/load** - Graph state not persisted
 6. **Edge validation** - No validation for which nodes can connect to which
+7. **Model listing** - Currently lists models on every request (could be cached)
+8. **Animation generation** - Not yet implemented (can follow preview pattern)
+9. **Prompt refinement** - May need further tuning for better 2D sprite results
 
 ---
 
@@ -382,6 +459,30 @@ handleDeleteNode(nodeId) // Removes node and all connected edges
 ### Check if Preview Can Play
 ```typescript
 hasIncomingEdges && isConnectedToPromptOrReference
+```
+
+### Generate Preview Image
+```typescript
+// In SpriteFlowPage.tsx - handleRegenerate
+// 1. Finds connected Prompt/Reference nodes
+// 2. Gathers prompt text and reference images (base64)
+// 3. Calls POST /api/preview with context
+// 4. Updates node with generated image
+```
+
+### API Endpoint: Generate Preview
+```typescript
+POST /api/preview
+Body: {
+  nodeId: string;
+  promptText?: string;
+  references?: { mimeType: string; base64: string }[];
+  seed?: number;
+}
+Response: {
+  nodeId: string;
+  imageBase64: string;
+}
 ```
 
 ### Get Graph State (for export)
@@ -399,6 +500,11 @@ setNodes((prev) =>
       : node
   )
 );
+```
+
+### Environment Variables Required
+```bash
+GEMINI_API_KEY=your_api_key_here
 ```
 
 ---
