@@ -14,7 +14,6 @@ import ReactFlow, {
   EdgeChange,
   applyNodeChanges,
   applyEdgeChanges,
-  ResizeControl,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { ReferenceNode } from "./nodes/ReferenceNode";
@@ -65,10 +64,6 @@ export function SpriteFlowCanvas({
     return nodes.map((node) => {
       const nodeData = { ...node.data };
       
-      // Enable resizing for nodes that display content (preview, animationPreview, spriteFramesPreview)
-      const resizableTypes = ["preview", "animationPreview", "spriteFramesPreview", "reference"];
-      const isResizable = resizableTypes.includes(nodeData.type);
-      
       // Add onRegenerate for preview and animationPreview nodes if not already set
       if (
         (nodeData.type === "preview" || nodeData.type === "animationPreview") &&
@@ -76,7 +71,6 @@ export function SpriteFlowCanvas({
       ) {
         return {
           ...node,
-          resizable: isResizable,
           data: {
             ...nodeData,
             onRegenerate,
@@ -84,10 +78,7 @@ export function SpriteFlowCanvas({
         };
       }
       
-      return {
-        ...node,
-        resizable: isResizable,
-      };
+      return node;
     });
   }, [nodes, onRegenerate]);
 

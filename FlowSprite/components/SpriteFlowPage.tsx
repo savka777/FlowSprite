@@ -4,7 +4,7 @@ import React, { useCallback } from "react";
 import { SpriteFlowCanvas, getGraphState } from "./flow/SpriteFlowCanvas";
 import { Node, Edge, NodeChange, EdgeChange, Connection, addEdge, applyNodeChanges, applyEdgeChanges } from "reactflow";
 import { SpriteNodeData, AnimationKind, NodeStatus } from "@/lib/flowTypes";
-import { ImageIcon, Type, Eye, Film, Video, Scissors, Grid3x3 } from "lucide-react";
+import { ImageIcon, Type, Eye, Film, Video, Scissors, Grid3x3, Gamepad2, X } from "lucide-react";
 
 const initialNodes: Node<SpriteNodeData>[] = [
   {
@@ -43,10 +43,30 @@ const initialEdges: Edge[] = [
   },
 ];
 
+// Demo data structure
+interface Demo {
+  id: string;
+  name: string;
+  description: string;
+  htmlPath: string;
+  thumbnail?: string;
+}
+
+const demos: Demo[] = [
+  {
+    id: "sidescroller",
+    name: "Sidescroller Game",
+    description: "A classic side-scrolling platformer game",
+    htmlPath: "/cropped_no_bg/sidescroller.html",
+  },
+];
+
 export function SpriteFlowPage() {
   const [nodes, setNodes] = React.useState<Node<SpriteNodeData>[]>(initialNodes);
   const [edges, setEdges] = React.useState<Edge[]>(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
+  const [showDemoGrid, setShowDemoGrid] = React.useState(false);
+  const [selectedDemo, setSelectedDemo] = React.useState<Demo | null>(null);
 
   const handleAddNode = useCallback((type: string, animationKind?: AnimationKind) => {
     const newNodeId = `${type}-${Date.now()}`;
@@ -977,6 +997,17 @@ export function SpriteFlowPage() {
                 Sprite Frames Preview
               </button>
             </div>
+            
+            {/* Community Demo Button at Bottom */}
+            <div className="pt-4 border-t border-gray-200 mt-4">
+              <button
+                onClick={() => setShowDemoGrid(true)}
+                className="w-full text-left px-4 py-2 rounded-lg border-2 border-yellow-400 bg-yellow-400 hover:bg-yellow-500 transition-colors text-sm font-medium flex items-center gap-2 text-black"
+              >
+                <Gamepad2 className="w-4 h-4" />
+                Community Demo
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1028,6 +1059,76 @@ export function SpriteFlowPage() {
           )}
         </div>
       </div>
+
+      {/* Demo Grid Modal */}
+      {showDemoGrid && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Community Demos</h2>
+              <button
+                onClick={() => setShowDemoGrid(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {demos.map((demo) => (
+                  <div
+                    key={demo.id}
+                    onClick={() => {
+                      setSelectedDemo(demo);
+                      setShowDemoGrid(false);
+                    }}
+                    className="border-2 border-gray-200 rounded-lg p-4 hover:border-yellow-400 hover:shadow-lg transition-all cursor-pointer bg-white"
+                  >
+                    <div className="aspect-video bg-gray-100 rounded mb-3 flex items-center justify-center">
+                      {demo.thumbnail ? (
+                        <img
+                          src={demo.thumbnail}
+                          alt={demo.name}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      ) : (
+                        <Gamepad2 className="w-12 h-12 text-gray-400" />
+                      )}
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-1">{demo.name}</h3>
+                    <p className="text-sm text-gray-600">{demo.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Viewer Modal */}
+      {selectedDemo && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
+          <div className="w-full h-full flex flex-col">
+            <div className="bg-gray-900 px-6 py-4 flex items-center justify-between border-b border-gray-700">
+              <h2 className="text-xl font-bold text-white">{selectedDemo.name}</h2>
+              <button
+                onClick={() => setSelectedDemo(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="flex-1 relative">
+              <iframe
+                src={selectedDemo.htmlPath}
+                className="w-full h-full border-0"
+                title={selectedDemo.name}
+                allow="fullscreen"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

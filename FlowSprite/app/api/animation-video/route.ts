@@ -3,11 +3,65 @@ import { GoogleGenAI } from "@google/genai";
 
 // Initialize Veo client
 const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-const veoModel = process.env.VEO_MODEL || "veo-3.1-fast-generate-preview";
+
+// Fallback chain of Veo models to try when hitting rate limits
+// Order: Try fastest/newest first, fall back to older models
+// Note: All Veo models have similar rate limits (2 RPM, 10 RPD on Free tier)
+// but switching can help if one model is temporarily unavailable
+const VEO_MODEL_FALLBACKS = [
+  "veo-3.1-fast-generate-preview",  // Primary: Fastest, newest
+  "veo-3.1-generate-preview",        // Fallback 1: Standard quality
+  "veo-3.0-generate-preview",        // Fallback 2: Older version
+  "veo-2-generate-preview",          // Fallback 3: Veo 2 (has higher RPD: 50 vs 10)
+];
+
+// Get initial model from env or use first in fallback chain
+const initialModel = process.env.VEO_MODEL || VEO_MODEL_FALLBACKS[0];
 
 const ai = new GoogleGenAI({
   apiKey: apiKey!,
 });
+
+// Helper function to list available Veo models
+async function listAvailableVeoModels() {
+  try {
+    if (!apiKey) {
+      console.warn("[Veo Models] No API key available to list models");
+      return [];
+    }
+    
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+    );
+    
+    if (!response.ok) {
+      console.error("[Veo Models] Failed to list models:", response.status, response.statusText);
+      return [];
+    }
+    
+    const data = await response.json();
+    const models = data.models || [];
+    
+    // Filter for Veo models
+    const veoModels = models.filter((model: any) => 
+      model.name?.toLowerCase().includes("veo")
+    );
+    
+    console.log("\n=== Available Veo Models ===");
+    veoModels.forEach((model: any) => {
+      console.log(`Model: ${model.name}`);
+      console.log(`  Display Name: ${model.displayName || "N/A"}`);
+      console.log(`  Supported Methods: ${model.supportedGenerationMethods?.join(", ") || "N/A"}`);
+      console.log(`  Description: ${model.description || "N/A"}`);
+      console.log("---");
+    });
+    
+    return veoModels.map((m: any) => m.name);
+  } catch (error) {
+    console.error("[Veo Models] Error listing models:", error);
+    return [];
+  }
+}
 
 // Type definitions
 interface AnimationVideoRequest {
@@ -161,165 +215,252 @@ export async function POST(request: NextRequest) {
     console.log(
       `[Animation Video] Generating ${animationKind} animation for node ${nodeId}`
     );
-    console.log(`[Animation Video] Using model: ${veoModel}`);
+    
+    // List available Veo models (for debugging and finding alternatives)
+    const availableVeoModels = await listAvailableVeoModels();
+    if (availableVeoModels.length > 0) {
+      console.log(`[Animation Video] Available Veo models: ${availableVeoModels.join(", ")}`);
+    }
+    
+    // Filter fallback models to only include available ones
+    const modelsToTry = VEO_MODEL_FALLBACKS.filter(model => 
+      availableVeoModels.length === 0 || availableVeoModels.includes(model)
+    );
+    
+    // If VEO_MODEL env var is set, prioritize it
+    const modelsToAttempt = initialModel && modelsToTry.includes(initialModel)
+      ? [initialModel, ...modelsToTry.filter(m => m !== initialModel)]
+      : modelsToTry;
+    
+    if (modelsToAttempt.length === 0) {
+      return NextResponse.json(
+        {
+          nodeId,
+          error: `No available Veo models found. Please check your API key and project configuration.`,
+        },
+        { status: 500 }
+      );
+    }
+    
+    console.log(`[Animation Video] Will try models in order: ${modelsToAttempt.join(" -> ")}`);
     console.log(`[Animation Video] Prompt length: ${fullPrompt.length} characters`);
     console.log(`[Animation Video] Extra prompt text: ${promptText || "none"}`);
 
-    // Step 1: Start the Veo operation using ai.models.generateVideos
-    // IMPORTANT: The image provided is a 2D pixel art sprite. Veo must maintain this exact style.
-    let operation = await ai.models.generateVideos({
-      model: veoModel,
-      prompt: fullPrompt,
-      image: {
-        mimeType: "image/png",
-        imageBytes: spriteBase64, // Pass the base64 string directly
-        // Note: This is a 2D pixel art sprite - do NOT enhance or render in 3D
-      },
-      config: {
-        aspectRatio: "16:9",
-        durationSeconds: 4, // Veo API requires 4-8 seconds, using minimum for faster generation
-        // Note: If the @google/genai types expose a resolution or quality field for 720p,
-        // it would be set here. Currently relying on aspectRatio and model defaults.
-        // seed, // Include if supported by the SDK
-      } as any,
-    } as any);
-
-    console.log(
-      `[Animation Video] Operation started: ${(operation as any).name || "unknown"}`
-    );
-
-    // Step 2: Poll until operation.done or max poll count is reached
-    let pollCount = 0;
-    const maxPolls = 60; // 60 * 5s = 5 minutes max
-
-    while (!operation.done && pollCount < maxPolls) {
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-      operation = await ai.operations.getVideosOperation({ operation });
-      pollCount++;
-      console.log(
-        `[Animation Video] Polling Veo... ${pollCount}/${maxPolls}, done=${operation.done}`
-      );
-    }
-
-    if (!operation.done) {
-      return NextResponse.json(
-        { nodeId, error: "Video generation timed out after maximum polling attempts" },
-        { status: 500 }
-      );
-    }
-
-    // Step 3: Extract the video object from the operation result
-    const result: any =
-      (operation as any).result ||
-      (operation as any).response ||
-      {};
-
-    const videos =
-      result.generatedVideos ||
-      result.videos ||
-      [];
-
-    if (!videos.length) {
-      console.error("Veo response structure:", JSON.stringify(result, null, 2));
-      return NextResponse.json(
-        { nodeId, error: "Veo response did not contain any videos" },
-        { status: 500 }
-      );
-    }
-
-    const video = videos[0].video;
-
-    if (!video) {
-      console.error("Video object missing from videos[0]:", videos[0]);
-      return NextResponse.json(
-        { nodeId, error: "Video object missing from Veo response" },
-        { status: 500 }
-      );
-    }
-
-    console.log(
-      `[Animation Video] Video generated, extracting bytes from: ${video.uri || "bytes"}`
-    );
-
-    // Step 4: Resolve actual bytes
-    let videoBytes: Uint8Array | Buffer | null = null;
-
-    if (video.bytes) {
-      // Direct bytes available
-      videoBytes = Buffer.isBuffer(video.bytes)
-        ? video.bytes
-        : Buffer.from(video.bytes);
-    } else if (video.uri && typeof video.uri === "string") {
-      const uri: string = video.uri;
-
-      if (uri.startsWith("http")) {
-        // HTTP URI - fetch with API key if needed
-        // Properly handle URLs that already have query parameters
-        const urlObj = new URL(uri);
-        if (apiKey) {
-          urlObj.searchParams.set("key", apiKey);
-        }
-        const url = urlObj.toString();
-        console.log(`[Animation Video] Downloading from HTTP URI: ${url.replace(apiKey || "", "***")}`);
+    // Try each model in the fallback chain until one succeeds
+    let lastError: any = null;
+    let successfulModel: string | null = null;
+    
+    for (const currentModel of modelsToAttempt) {
+      console.log(`[Animation Video] Attempting with model: ${currentModel}`);
+      
+      try {
+        // Step 1: Start the Veo operation using ai.models.generateVideos
+        // IMPORTANT: The image provided is a 2D pixel art sprite. Veo must maintain this exact style.
+        let operation = await ai.models.generateVideos({
+          model: currentModel,
+          prompt: fullPrompt,
+          image: {
+            mimeType: "image/png",
+            imageBytes: spriteBase64, // Pass the base64 string directly
+            // Note: This is a 2D pixel art sprite - do NOT enhance or render in 3D
+          },
+          config: {
+            aspectRatio: "16:9",
+            durationSeconds: 4, // Veo API requires 4-8 seconds, using minimum for faster generation
+            // Note: If the @google/genai types expose a resolution or quality field for 720p,
+            // it would be set here. Currently relying on aspectRatio and model defaults.
+            // seed, // Include if supported by the SDK
+          } as any,
+        } as any);
         
-        const resp = await fetch(url);
-        if (!resp.ok) {
-          const text = await resp.text();
-          console.error("Veo download error:", text);
-          return NextResponse.json(
-            {
-              nodeId,
-              error: `Download error: ${resp.status} ${resp.statusText}`,
-            },
-            { status: resp.status }
-          );
+        successfulModel = currentModel;
+
+        console.log(
+          `[Animation Video] Operation started with ${currentModel}: ${(operation as any).name || "unknown"}`
+        );
+
+        // Step 2: Poll until operation.done or max poll count is reached
+        let pollCount = 0;
+        const maxPolls = 60; // 60 * 5s = 5 minutes max
+
+        while (!operation.done && pollCount < maxPolls) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          try {
+            operation = await ai.operations.getVideosOperation({ operation });
+            pollCount++;
+            console.log(
+              `[Animation Video] Polling ${currentModel}... ${pollCount}/${maxPolls}, done=${operation.done}`
+            );
+          } catch (pollError: any) {
+            // Handle rate limit errors during polling - try next model
+            if (pollError?.status === 429 || pollError?.statusCode === 429) {
+              console.warn(`[Animation Video] Rate limit during polling with ${currentModel}, will try next model`);
+              lastError = pollError;
+              throw pollError; // Break out of this model attempt, try next
+            }
+            // Re-throw other errors
+            throw pollError;
+          }
         }
-        const arrBuf = await resp.arrayBuffer();
-        videoBytes = Buffer.from(arrBuf);
-      } else if (uri.startsWith("gs://")) {
-        // GCS URI - not supported in this implementation
-        console.error("GCS URI not supported in this Node implementation:", uri);
-        return NextResponse.json(
-          { nodeId, error: "GCS URI outputs not supported in this environment" },
-          { status: 500 }
+
+        if (!operation.done) {
+          const timeoutError = new Error("Video generation timed out after maximum polling attempts");
+          (timeoutError as any).status = 500;
+          throw timeoutError;
+        }
+
+        // Step 3: Extract the video object from the operation result
+        const result: any =
+          (operation as any).result ||
+          (operation as any).response ||
+          {};
+
+        const videos =
+          result.generatedVideos ||
+          result.videos ||
+          [];
+
+        if (!videos.length) {
+          console.error("Veo response structure:", JSON.stringify(result, null, 2));
+          const noVideosError = new Error("Veo response did not contain any videos");
+          (noVideosError as any).status = 500;
+          throw noVideosError;
+        }
+
+        const video = videos[0].video;
+
+        if (!video) {
+          console.error("Video object missing from videos[0]:", videos[0]);
+          const noVideoError = new Error("Video object missing from Veo response");
+          (noVideoError as any).status = 500;
+          throw noVideoError;
+        }
+
+        console.log(
+          `[Animation Video] Video generated with ${currentModel}, extracting bytes from: ${video.uri || "bytes"}`
         );
-      } else {
-        // Unsupported URI format
-        console.error("Unsupported video URI:", uri);
-        return NextResponse.json(
-          { nodeId, error: "Unsupported video URI format" },
-          { status: 500 }
+
+        // Step 4: Resolve actual bytes
+        let videoBytes: Uint8Array | Buffer | null = null;
+
+        if (video.bytes) {
+          // Direct bytes available
+          videoBytes = Buffer.isBuffer(video.bytes)
+            ? video.bytes
+            : Buffer.from(video.bytes);
+        } else if (video.uri && typeof video.uri === "string") {
+          const uri: string = video.uri;
+
+          if (uri.startsWith("http")) {
+            // HTTP URI - fetch with API key if needed
+            // Properly handle URLs that already have query parameters
+            const urlObj = new URL(uri);
+            if (apiKey) {
+              urlObj.searchParams.set("key", apiKey);
+            }
+            const url = urlObj.toString();
+            console.log(`[Animation Video] Downloading from HTTP URI: ${url.replace(apiKey || "", "***")}`);
+            
+            const resp = await fetch(url);
+            if (!resp.ok) {
+              const text = await resp.text();
+              console.error("Veo download error:", text);
+              const downloadError = new Error(`Download error: ${resp.status} ${resp.statusText}`);
+              (downloadError as any).status = resp.status;
+              throw downloadError;
+            }
+            const arrBuf = await resp.arrayBuffer();
+            videoBytes = Buffer.from(arrBuf);
+          } else if (uri.startsWith("gs://")) {
+            // GCS URI - not supported in this implementation
+            console.error("GCS URI not supported in this Node implementation:", uri);
+            const gcsError = new Error("GCS URI outputs not supported in this environment");
+            (gcsError as any).status = 500;
+            throw gcsError;
+          } else {
+            // Unsupported URI format
+            console.error("Unsupported video URI:", uri);
+            const uriError = new Error("Unsupported video URI format");
+            (uriError as any).status = 500;
+            throw uriError;
+          }
+        }
+
+        if (!videoBytes) {
+          console.error("Could not resolve video bytes. Video object:", video);
+          const bytesError = new Error("Could not resolve video bytes from Veo");
+          (bytesError as any).status = 500;
+          throw bytesError;
+        }
+
+        // Step 5: Convert to base64 and return JSON
+        const buf = Buffer.isBuffer(videoBytes)
+          ? videoBytes
+          : Buffer.from(videoBytes);
+
+        const videoBase64 = buf.toString("base64");
+
+        console.log(
+          `[Animation Video] Successfully generated video with ${currentModel} for node ${nodeId} (${buf.length} bytes)`
         );
+
+        // Success! Break out of the retry loop
+        return NextResponse.json({
+          nodeId,
+          animationKind,
+          videoBase64,
+          mimeType: "video/mp4",
+        });
+        
+      } catch (modelError: any) {
+        // If this is a 429 (rate limit), try the next model
+        if (modelError?.status === 429 || modelError?.statusCode === 429) {
+          console.warn(`[Animation Video] Rate limit hit with ${currentModel}, trying next model...`);
+          lastError = modelError;
+          // Continue to next model in the fallback chain
+          continue;
+        }
+        
+        // For non-429 errors, if this is the last model, fail
+        // Otherwise, continue to next model
+        lastError = modelError;
+        if (currentModel === modelsToAttempt[modelsToAttempt.length - 1]) {
+          // This was the last model, re-throw the error
+          throw modelError;
+        }
+        console.warn(`[Animation Video] Error with ${currentModel}, trying next model:`, modelError.message);
+        continue;
       }
     }
-
-    if (!videoBytes) {
-      console.error("Could not resolve video bytes. Video object:", video);
+    
+    // If we get here, all models failed
+    const allModelsFailed = modelsToAttempt.length > 1
+      ? `All ${modelsToAttempt.length} models failed. Last error from ${modelsToAttempt[modelsToAttempt.length - 1]}: ${lastError?.message || "Unknown error"}`
+      : lastError?.message || "Unknown error";
+    
+    return NextResponse.json(
+      {
+        nodeId,
+        error: allModelsFailed,
+      },
+      { status: lastError?.status || lastError?.statusCode || 500 }
+    );
+  } catch (err: any) {
+    // This catch block handles unexpected errors that weren't caught by the model retry loop
+    // (e.g., validation errors, API key issues, etc.)
+    console.error("Error generating animation video:", err);
+    
+    // Handle API errors
+    if (err?.message?.includes("ApiError") || err?.message?.includes("GoogleGenAI")) {
       return NextResponse.json(
-        { nodeId, error: "Could not resolve video bytes from Veo" },
-        { status: 500 }
+        {
+          nodeId,
+          error: `Veo API Error: ${err.message}`,
+        },
+        { status: err?.status || err?.statusCode || 500 }
       );
     }
-
-    // Step 5: Convert to base64 and return JSON
-    const buf = Buffer.isBuffer(videoBytes)
-      ? videoBytes
-      : Buffer.from(videoBytes);
-
-    const videoBase64 = buf.toString("base64");
-
-    console.log(
-      `[Animation Video] Successfully generated video for node ${nodeId} (${buf.length} bytes)`
-    );
-
-    return NextResponse.json({
-      nodeId,
-      animationKind,
-      videoBase64,
-      mimeType: "video/mp4",
-    });
-  } catch (err: any) {
-    console.error("Error generating animation video:", err);
+    
     return NextResponse.json(
       {
         nodeId,

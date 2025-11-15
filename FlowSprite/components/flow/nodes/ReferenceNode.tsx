@@ -6,7 +6,7 @@ import { ReferenceNodeData } from "@/lib/flowTypes";
 import { SpriteNodeWrapper } from "./SpriteNodeWrapper";
 import { ImageIcon } from "lucide-react";
 
-export function ReferenceNode({ id, data, width, height }: NodeProps<ReferenceNodeData>) {
+export function ReferenceNode({ id, data }: NodeProps<ReferenceNodeData>) {
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -57,8 +57,6 @@ export function ReferenceNode({ id, data, width, height }: NodeProps<ReferenceNo
         showDelete={true}
         onDelete={handleDelete}
         borderColor="#4C97FF" // Scratch blue
-        width={width}
-        height={height}
       >
         <div className="space-y-2">
           <label className="block">

@@ -4,19 +4,6 @@ import React from "react";
 import { RotateCw, Trash2, Play } from "lucide-react";
 import { NodeStatus } from "@/lib/flowTypes";
 
-interface SpriteNodeWrapperProps {
-  title: string;
-  status?: NodeStatus;
-  showRedo?: boolean;
-  onRedo?: () => void;
-  showDelete?: boolean;
-  onDelete?: () => void;
-  showPlay?: boolean;
-  onPlay?: () => void;
-  borderColor?: string; // Scratch-style border color
-  children: React.ReactNode;
-}
-
 const statusColors: Record<NodeStatus, string> = {
   idle: "bg-gray-500",
   generating: "bg-yellow-500",
@@ -35,8 +22,6 @@ interface SpriteNodeWrapperProps {
   showPlay?: boolean;
   onPlay?: () => void;
   borderColor?: string; // Scratch-style border color
-  width?: number;
-  height?: number;
   children: React.ReactNode;
 }
 
@@ -50,18 +35,14 @@ export function SpriteNodeWrapper({
   showPlay = false,
   onPlay,
   borderColor = "#E5E7EB", // Default gray
-  width,
-  height,
   children,
 }: SpriteNodeWrapperProps) {
   return (
     <div 
-      className="bg-white rounded-2xl shadow-lg p-4 min-w-[200px] h-full"
+      className="bg-white rounded-2xl shadow-lg p-4 min-w-[200px]"
       style={{
         border: `3px solid ${borderColor}`,
         boxShadow: `0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 0 0 1px ${borderColor}`,
-        width: width ? `${width}px` : undefined,
-        height: height ? `${height}px` : undefined,
       }}
     >
       {/* Header with title, status, and action buttons */}

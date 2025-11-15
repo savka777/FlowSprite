@@ -6,7 +6,7 @@ import { PreviewNodeData } from "@/lib/flowTypes";
 import { SpriteNodeWrapper } from "./SpriteNodeWrapper";
 import { Loader2 } from "lucide-react";
 
-export function PreviewNode({ id, data, width, height }: NodeProps<PreviewNodeData>) {
+export function PreviewNode({ id, data }: NodeProps<PreviewNodeData>) {
   const handleRegenerate = () => {
     if (data.onRegenerate) {
       data.onRegenerate(id);
@@ -41,11 +41,9 @@ export function PreviewNode({ id, data, width, height }: NodeProps<PreviewNodeDa
         showDelete={true}
         onDelete={handleDelete}
         borderColor="#9966FF" // Scratch purple
-        width={width}
-        height={height}
       >
-        <div className="space-y-2 flex flex-col h-full">
-          <div className="border border-gray-300 rounded-lg bg-white flex items-center justify-center w-full flex-1 min-h-[120px]">
+        <div className="space-y-2">
+          <div className="border border-gray-300 rounded-lg bg-white flex items-center justify-center w-full h-48">
             {data.status === "generating" ? (
               <div className="flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />

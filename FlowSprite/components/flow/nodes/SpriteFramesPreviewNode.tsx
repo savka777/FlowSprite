@@ -9,8 +9,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 export function SpriteFramesPreviewNode({
   id,
   data,
-  width,
-  height,
 }: NodeProps<SpriteFramesPreviewNodeData>) {
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
 
@@ -62,8 +60,6 @@ export function SpriteFramesPreviewNode({
         showDelete={true}
         onDelete={handleDelete}
         borderColor="#3498DB" // Blue for frames preview node
-        width={width}
-        height={height}
       >
         <div className="space-y-2">
           {data.status === "error" && data.errorMessage && (

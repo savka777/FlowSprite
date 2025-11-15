@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidescroller Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            background: #87CEEB;
+        }
+        #instructions {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        #instructions h3 {
+            margin: 0 0 10px 0;
+        }
+        #instructions p {
+            margin: 5px 0;
+        }
+        #sprite-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 500px;
+            font-size: 13px;
+        }
+        #sprite-info strong {
+            display: block;
+            margin-bottom: 10px;
+        }
+        #sprite-info ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        #sprite-info pre {
+            background: #f0f0f0;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 11px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="instructions">
+        <h3>Controls:</h3>
+        <p>← → Arrow Keys: Move</p>
+        <p>Space/↑: Jump</p>
+        <p id="frameCounter">Frame: 1/32</p>
+    </div>
+<!--
+    <div id="sprite-info">
+        <strong>To use your sprite frames (displayed at 192×192):</strong>
+        <ol>
+            <li>Put your 32 sprite images in the same folder as this HTML file</li>
+            <li>Name them: sprite1.png, sprite2.png, ... sprite32.png</li>
+            <li>Add bg.jpg in the same folder for the background image</li>
+            <li>The game will automatically load them!</li>
+            <li>Frames 1-2 alternate slowly when idle or jumping</li>
+            <li>All 32 frames animate smoothly when moving left/right on ground</li>
+            <li>Sprite automatically flips based on movement direction</li>
+            <li>Jump height is half the sprite height (96 pixels)</li>
+        </ol>
+        <p style="margin-top: 10px; font-size: 12px; color: #666;">
+            Currently showing placeholder sprites. Your images will appear once they're in the same folder.
+        </p>
+    </div>
+--> 
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Game constants
+        const MOVE_SPEED = 5;
+        const SPRITE_WIDTH = 288;
+        const SPRITE_HEIGHT = 288;
+        const GRAVITY = 0.8;
+        const JUMP_STRENGTH = -12; // Adjusted for half-height jump (96 pixels)
+        const GROUND_LEVEL = canvas.height - 150 - SPRITE_HEIGHT;
+        const TOTAL_FRAMES = 32;
+
+        // Game state
+        const player = {
+            x: 100,
+            y: GROUND_LEVEL,
+            velocityY: 0,
+            isJumping: false,
+            facingRight: true
+        };
+
+        const keys = {
+            left: false,
+            right: false
+        };
+
+        let currentFrame = 0;
+        let animationTimer = 0;
+        let scrollOffset = 0;
+
+        // Try to load sprite images
+        const spriteImages = [];
+        let spritesLoaded = false;
+        let loadedCount = 0;
+
+        // Load background image
+        const bgImage = new Image();
+        let bgLoaded = false;
+        bgImage.onload = () => {
+            bgLoaded = true;
+            console.log('Background loaded!');
+        };
+        bgImage.onerror = () => {
+            console.log('bg.jpg not found, using default background');
+        };
+        bgImage.src = 'bg.jpg';
+
+        for (let i = 1; i <= TOTAL_FRAMES; i++) {
+            const img = new Image();
+            img.onload = () => {
+                loadedCount++;
+                if (loadedCount === TOTAL_FRAMES) {
+                    spritesLoaded = true;
+                    console.log('All sprites loaded!');
+                }
+            };
+            img.onerror = () => {
+                // Silently fail - we'll use placeholder instead
+            };
+            img.src = `sprite${i}.png`;
+            spriteImages.push(img);
+        }
+
+        // Input handling
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'ArrowRight') keys.right = true;
+            if (e.key === ' ' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!player.isJumping) {
+                    player.velocityY = JUMP_STRENGTH;
+                    player.isJumping = true;
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'ArrowRight') keys.right = false;
+        });
+
+        // Resize canvas when window resizes
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Placeholder sprite colors
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F',
+            '#BB8FCE', '#85C1E2', '#F8B195', '#C06C84', '#6C5B7B', '#FF9AA2',
+            '#FFB347', '#87CEEB', '#E6E6FA', '#DDA0DD', '#F0E68C', '#B0E0E6',
+            '#FFDAB9', '#D8BFD8', '#AFEEEE', '#F5DEB3', '#FFE4E1', '#E0BBE4',
+            '#FFDFD3', '#C2D4DD', '#957DAD', '#D291BC', '#FEC8D8', '#FFDFD3',
+            '#A8E6CF', '#FFD3B6'
+        ];
+
+        // Draw sprite
+        function drawSprite() {
+            ctx.save(); // Save the current canvas state
+            
+            // Calculate sprite center
+            const centerX = player.x + SPRITE_WIDTH / 2;
+            const centerY = player.y + SPRITE_HEIGHT / 2;
+            
+            // Move to sprite center, flip if facing right (since sprites default to left)
+            ctx.translate(centerX, centerY);
+            if (player.facingRight) {
+                ctx.scale(-1, 1); // Flip horizontally when facing right
+            }
+            
+            if (spritesLoaded && spriteImages[currentFrame].complete) {
+                // Draw actual sprite image centered
+                ctx.drawImage(
+                    spriteImages[currentFrame],
+                    -SPRITE_WIDTH / 2,
+                    -SPRITE_HEIGHT / 2,
+                    SPRITE_WIDTH,
+                    SPRITE_HEIGHT
+                );
+            } else {
+                // Draw placeholder centered
+                ctx.fillStyle = colors[currentFrame];
+                ctx.fillRect(-SPRITE_WIDTH / 2, -SPRITE_HEIGHT / 2, SPRITE_WIDTH, SPRITE_HEIGHT);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(-SPRITE_WIDTH / 2, -SPRITE_HEIGHT / 2, SPRITE_WIDTH, SPRITE_HEIGHT);
+                
+                // Draw frame number and direction indicator
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`Frame ${currentFrame + 1}`, 0, -5);
+                
+                // Direction arrow
+                ctx.font = 'bold 20px Arial';
+                ctx.fillText(player.facingRight ? '→' : '←', 0, 10);
+            }
+            
+            ctx.restore(); // Restore the canvas state
+        }
+
+        // Draw background
+        function drawBackground() {
+            if (bgLoaded && bgImage.complete) {
+                // Draw the background image with parallax scrolling
+                const bgX = -scrollOffset * 0.5; // Parallax effect - moves slower than foreground
+                
+                // Tile the background to cover the whole canvas
+                const bgWidth = bgImage.width;
+                const bgHeight = bgImage.height;
+                
+                // Scale to fit canvas height
+                const scale = canvas.height / bgHeight;
+                const scaledWidth = bgWidth * scale;
+                
+                // Calculate how many times to tile
+                const startX = Math.floor(bgX / scaledWidth) * scaledWidth;
+                
+                for (let x = startX; x < canvas.width; x += scaledWidth) {
+                    ctx.drawImage(bgImage, x, 0, scaledWidth, canvas.height);
+                }
+            } else {
+                // Fallback: Default sky and clouds
+                ctx.fillStyle = '#87CEEB';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Clouds
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.beginPath();
+                ctx.ellipse(-scrollOffset % 400 + 100, 50, 40, 20, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(300 - scrollOffset % 400 + 100, 100, 50, 25, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Ground (always draw this)
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, canvas.height - 150, canvas.width, 150);
+            
+            // Grass
+            ctx.fillStyle = '#7CB342';
+            ctx.fillRect(0, canvas.height - 150, canvas.width, 20);
+        }
+
+        // Update game state
+        function update() {
+            // Horizontal movement
+            if (keys.left) {
+                player.x -= MOVE_SPEED;
+                player.facingRight = false;
+            }
+            if (keys.right) {
+                player.x += MOVE_SPEED;
+                player.facingRight = true;
+            }
+
+            // Keep player in bounds
+            player.x = Math.max(50, Math.min(canvas.width - SPRITE_WIDTH - 50, player.x));
+
+            // Apply gravity
+            player.velocityY += GRAVITY;
+            player.y += player.velocityY;
+
+            // Ground collision
+            if (player.y >= GROUND_LEVEL) {
+                player.y = GROUND_LEVEL;
+                player.velocityY = 0;
+                player.isJumping = false;
+            }
+
+            // Update scroll offset
+            if (keys.right) scrollOffset += 2;
+            if (keys.left) scrollOffset = Math.max(0, scrollOffset - 2);
+
+            // Animate sprite frames
+            if (player.isJumping) {
+                // Jumping - use idle animation (frames 1-2)
+                animationTimer++;
+                if (animationTimer >= 30) {
+                    currentFrame = currentFrame === 0 ? 1 : 0;
+                    animationTimer = 0;
+                    document.getElementById('frameCounter').textContent = `Frame: ${currentFrame + 1}/${TOTAL_FRAMES} (Jumping)`;
+                }
+            } else if (keys.left || keys.right) {
+                // Moving on ground - cycle through all 32 frames
+                animationTimer++;
+                if (animationTimer >= 3) {
+                    currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
+                    animationTimer = 0;
+                    document.getElementById('frameCounter').textContent = `Frame: ${currentFrame + 1}/${TOTAL_FRAMES}`;
+                }
+            } else {
+                // Idle on ground - slowly alternate between frame 1 and 2
+                animationTimer++;
+                if (animationTimer >= 30) {
+                    currentFrame = currentFrame === 0 ? 1 : 0;
+                    animationTimer = 0;
+                    document.getElementById('frameCounter').textContent = `Frame: ${currentFrame + 1}/${TOTAL_FRAMES} (Idle)`;
+                }
+            }
+        }
+
+        // Main game loop
+        function gameLoop() {
+            update();
+            drawBackground();
+            drawSprite();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Debug: Log initial sprite position
+        console.log('Sprite starting position:', player);
+        console.log('Ground level:', GROUND_LEVEL);
+        console.log('Canvas height:', canvas.height);
+
+        // Start the game
+        gameLoop();
+    </script>
+</body>
+</html>
