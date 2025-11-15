@@ -269,6 +269,202 @@ export function SpriteFlowPage() {
     [handleRegenerate]
   );
 
+  const handleGenerateAnimation = useCallback(
+    async (nodeId: string) => {
+      console.log("Generating animation for node:", nodeId);
+
+      // Find the Animation node
+      const animationNode = nodes.find(
+        (n) => n.id === nodeId && n.data.type === "animation"
+      );
+      if (!animationNode || animationNode.data.type !== "animation") {
+        console.warn("Node not found or not an animation node:", nodeId);
+        return;
+      }
+
+      // Update status to generating
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (node.id === nodeId && node.data.type === "animation") {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                status: "generating" as NodeStatus,
+              },
+            };
+          }
+          return node;
+        })
+      );
+
+      // Also update connected AnimationPreview nodes
+      const connectedPreviewNodes = edges
+        .filter((edge) => edge.source === nodeId)
+        .map((edge) => edge.target)
+        .map((targetId) => nodes.find((n) => n.id === targetId))
+        .filter(
+          (node): node is Node<SpriteNodeData> =>
+            node !== undefined && node.data.type === "animationPreview"
+        );
+
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (
+            connectedPreviewNodes.some((pn) => pn.id === node.id) &&
+            node.data.type === "animationPreview"
+          ) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                status: "generating" as NodeStatus,
+              },
+            };
+          }
+          return node;
+        })
+      );
+
+      try {
+        // Find connected Preview node
+        const incomingEdges = edges.filter((edge) => edge.target === nodeId);
+        const sourceNodeIds = incomingEdges.map((edge) => edge.source);
+        const connectedNodes = nodes.filter((n) =>
+          sourceNodeIds.includes(n.id)
+        );
+
+        const previewNode = connectedNodes.find(
+          (n) => n.data.type === "preview"
+        );
+        if (!previewNode || previewNode.data.type !== "preview") {
+          throw new Error("No connected Preview node found");
+        }
+
+        // Extract sprite base64
+        let spriteBase64: string;
+        if (previewNode.data.imageUrl) {
+          // Extract from data URL: "data:image/png;base64,<base64>"
+          const dataUrl = previewNode.data.imageUrl;
+          const base64Match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+          if (base64Match) {
+            spriteBase64 = base64Match[1];
+          } else {
+            throw new Error("Invalid imageUrl format");
+          }
+        } else {
+          throw new Error("Preview node has no image");
+        }
+
+        // Call API
+        const response = await fetch("/api/animation-video", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nodeId,
+            animationKind: animationNode.data.animationKind,
+            spriteBase64,
+            promptText: animationNode.data.extraPrompt || undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({
+            error: "Unknown error",
+          }));
+          const errorMessage = errorData.error || `HTTP ${response.status}`;
+          throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        const { videoBase64, mimeType } = result;
+
+        // Update Animation node
+        setNodes((prev) =>
+          prev.map((node) => {
+            if (node.id === nodeId && node.data.type === "animation") {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  videoBase64,
+                  mimeType: mimeType || "video/mp4",
+                  status: "ready" as NodeStatus,
+                },
+              };
+            }
+            return node;
+          })
+        );
+
+        // Update connected AnimationPreview nodes
+        setNodes((prev) =>
+          prev.map((node) => {
+            if (
+              connectedPreviewNodes.some((pn) => pn.id === node.id) &&
+              node.data.type === "animationPreview"
+            ) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  videoBase64,
+                  mimeType: mimeType || "video/mp4",
+                  status: "ready" as NodeStatus,
+                  animationKind: animationNode.data.animationKind,
+                },
+              };
+            }
+            return node;
+          })
+        );
+      } catch (error) {
+        console.error("Error generating animation video:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+
+        // Update Animation node to error
+        setNodes((prev) =>
+          prev.map((node) => {
+            if (node.id === nodeId && node.data.type === "animation") {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  status: "error" as NodeStatus,
+                },
+              };
+            }
+            return node;
+          })
+        );
+
+        // Update connected AnimationPreview nodes to error
+        setNodes((prev) =>
+          prev.map((node) => {
+            if (
+              connectedPreviewNodes.some((pn) => pn.id === node.id) &&
+              node.data.type === "animationPreview"
+            ) {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  status: "error" as NodeStatus,
+                  errorMessage,
+                },
+              };
+            }
+            return node;
+          })
+        );
+      }
+    },
+    [nodes, edges]
+  );
+
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   }, []);
@@ -349,20 +545,61 @@ export function SpriteFlowPage() {
         };
       }
       if (node.data.type === "animation") {
+        // Check if connected to a Preview node (similar to Preview node checking for Prompt/Reference)
+        const animationIncomingEdges = edges.filter((edge) => edge.target === node.id);
+        const animationSourceNodeIds = animationIncomingEdges.map((edge) => edge.source);
+        const animationConnectedNodes = nodes.filter((n) =>
+          animationSourceNodeIds.includes(n.id)
+        );
+        const isConnectedToPreview = animationConnectedNodes.some(
+          (n) => n.data.type === "preview" && n.data.imageUrl
+        );
+
         return {
           ...node,
           data: {
             ...node.data,
+            onUpdate: (updates: Partial<typeof node.data>) => {
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === node.id
+                    ? { ...n, data: { ...n.data, ...updates } }
+                    : n
+                )
+              );
+            },
             onDelete: () => handleDeleteNode(node.id),
+            onGenerateAnimation: () => handleGenerateAnimation(node.id),
+            onPlay: hasIncomingEdges && isConnectedToPreview
+              ? () => handleGenerateAnimation(node.id)
+              : undefined,
+            hasIncomingEdges,
+            isConnectedToPreview,
           },
         };
       }
       if (node.data.type === "animationPreview") {
+        // Find the connected animation node
+        const incomingEdges = edges.filter((edge) => edge.target === node.id);
+        const sourceNodeIds = incomingEdges.map((edge) => edge.source);
+        const animationNode = nodes.find(
+          (n) =>
+            sourceNodeIds.includes(n.id) &&
+            n.data.type === "animation" &&
+            n.data.animationKind
+        );
+
         return {
           ...node,
           data: {
             ...node.data,
             onDelete: () => handleDeleteNode(node.id),
+            onGenerateAnimation: animationNode
+              ? () => handleGenerateAnimation(animationNode.id)
+              : undefined,
+            onRegenerate: animationNode
+              ? () => handleGenerateAnimation(animationNode.id)
+              : undefined,
           },
         };
       }
@@ -374,7 +611,7 @@ export function SpriteFlowPage() {
         },
       };
     });
-  }, [nodes, edges, setNodes, handleDeleteNode, handlePlay]);
+  }, [nodes, edges, setNodes, handleDeleteNode, handlePlay, handleGenerateAnimation]);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 

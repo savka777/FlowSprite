@@ -124,7 +124,7 @@ export function SpriteFlowCanvas({
 export function getGraphState(nodes: Node[], edges: Edge[]) {
   return {
     nodes: nodes.map((node) => {
-      const { onUpdate, onRegenerate, onDelete, onPlay, hasIncomingEdges, isConnectedToPromptOrReference, ...serializableData } = node.data as any;
+      const { onUpdate, onRegenerate, onDelete, onPlay, onGenerateAnimation, hasIncomingEdges, isConnectedToPromptOrReference, isConnectedToPreview, ...serializableData } = node.data as any;
       return {
         id: node.id,
         type: node.type,

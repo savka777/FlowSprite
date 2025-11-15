@@ -31,16 +31,31 @@ export interface PreviewNodeData {
 
 export interface AnimationNodeData {
   type: 'animation';
+  label?: string;
   animationKind: AnimationKind;
   status: NodeStatus;
+  videoBase64?: string; // MP4 as base64 (no data: prefix)
+  mimeType?: string; // e.g. "video/mp4"
+  extraPrompt?: string; // optional user text to tweak motion
+  onUpdate?: (updates: Partial<AnimationNodeData>) => void;
   onDelete?: () => void;
+  onGenerateAnimation?: (nodeId: string) => void;
+  onPlay?: () => void;
+  hasIncomingEdges?: boolean;
+  isConnectedToPreview?: boolean;
 }
 
 export interface AnimationPreviewNodeData {
   type: 'animationPreview';
+  label?: string;
+  animationKind?: AnimationKind;
   status: NodeStatus;
+  videoBase64?: string;
+  mimeType?: string;
+  errorMessage?: string;
   onRegenerate?: (nodeId: string) => void;
   onDelete?: () => void;
+  onGenerateAnimation?: (animationNodeId: string) => void;
 }
 
 export type SpriteNodeData =
