@@ -4,7 +4,9 @@ export type AnimationKind = 'idle' | 'walk' | 'run' | 'jump';
 
 export interface ReferenceNodeData {
   type: 'reference';
-  imageUrl?: string;
+  imageUrl?: string; // For local preview display
+  imageBase64?: string; // Base64 encoded image data for API
+  mimeType?: string; // MIME type of the image (e.g., "image/png", "image/jpeg")
   onUpdate?: (updates: Partial<ReferenceNodeData>) => void;
   onDelete?: () => void;
 }

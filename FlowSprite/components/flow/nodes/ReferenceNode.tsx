@@ -11,11 +11,33 @@ export function ReferenceNode({ id, data }: NodeProps<ReferenceNodeData>) {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-        // TODO: Upload to backend and get imageUrl
+        // Create local preview URL
         const imageUrl = URL.createObjectURL(file);
-        if (data.onUpdate) {
-          data.onUpdate({ imageUrl });
-        }
+        
+        // Read file as base64 for API
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          // Extract base64 data (remove data URL prefix)
+          const base64 = result.split(",")[1];
+          const mimeType = file.type || "image/png";
+          
+          if (data.onUpdate) {
+            data.onUpdate({
+              imageUrl,
+              imageBase64: base64,
+              mimeType,
+            });
+          }
+        };
+        reader.onerror = () => {
+          console.error("Error reading file");
+          // Still update with imageUrl for preview even if base64 fails
+          if (data.onUpdate) {
+            data.onUpdate({ imageUrl });
+          }
+        };
+        reader.readAsDataURL(file);
       }
     },
     [data]

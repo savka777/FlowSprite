@@ -96,14 +96,21 @@ export function SpriteFlowPage() {
     // TODO: Replace with API call to backend
   }, [nodes, edges]);
 
-  const handleRegenerate = useCallback((nodeId: string) => {
-    console.log("Regenerating node:", nodeId);
-    // TODO: Call backend API to regenerate sprite/animation
-    // For now, just update status
-    setNodes((prev) =>
-      prev.map((node) => {
-        if (node.id === nodeId) {
-          if (node.data.type === "preview" || node.data.type === "animationPreview") {
+  const handleRegenerate = useCallback(
+    async (nodeId: string) => {
+      console.log("Regenerating node:", nodeId);
+
+      // Find the Preview node
+      const previewNode = nodes.find((n) => n.id === nodeId);
+      if (!previewNode || previewNode.data.type !== "preview") {
+        console.warn("Node not found or not a preview node:", nodeId);
+        return;
+      }
+
+      // Update status to generating
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (node.id === nodeId && node.data.type === "preview") {
             return {
               ...node,
               data: {
@@ -112,11 +119,115 @@ export function SpriteFlowPage() {
               },
             };
           }
+          return node;
+        })
+      );
+
+      try {
+        // Find all incoming edges to this Preview node
+        const incomingEdges = edges.filter((edge) => edge.target === nodeId);
+        const sourceNodeIds = incomingEdges.map((edge) => edge.source);
+        const connectedNodes = nodes.filter((n) => sourceNodeIds.includes(n.id));
+
+        // Extract prompt text from first connected Prompt node
+        const promptNode = connectedNodes.find((n) => n.data.type === "prompt");
+        const promptText =
+          promptNode && promptNode.data.type === "prompt"
+            ? promptNode.data.prompt
+            : undefined;
+
+        // Extract reference images from connected Reference nodes
+        const referenceNodes = connectedNodes.filter((n) => n.data.type === "reference");
+        const references: { mimeType: string; base64: string }[] = [];
+
+        for (const refNode of referenceNodes) {
+          if (refNode.data.type === "reference" && refNode.data.imageBase64 && refNode.data.mimeType) {
+            references.push({
+              mimeType: refNode.data.mimeType,
+              base64: refNode.data.imageBase64,
+            });
+          }
         }
-        return node;
-      })
-    );
-  }, []);
+
+        // Generate seed from nodeId for determinism
+        let seed = 0;
+        for (let i = 0; i < nodeId.length; i++) {
+          const char = nodeId.charCodeAt(i);
+          seed = (seed << 5) - seed + char;
+          seed = seed & seed; // Convert to 32-bit integer
+        }
+        seed = Math.abs(seed);
+
+        // Call API
+        const response = await fetch("/api/preview", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nodeId,
+            promptText,
+            references: references.length > 0 ? references : undefined,
+            seed,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          const errorMessage = errorData.error || `HTTP ${response.status}`;
+          
+          // Log quota errors for debugging
+          if (response.status === 429) {
+            console.error("Quota exceeded:", errorMessage);
+            console.warn("You may need to upgrade your Gemini API plan or wait for quota reset.");
+          }
+          
+          throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        const { imageBase64 } = result;
+
+        // Convert base64 to data URL
+        const imageUrl = `data:image/png;base64,${imageBase64}`;
+
+        // Update node with generated image
+        setNodes((prev) =>
+          prev.map((node) => {
+            if (node.id === nodeId && node.data.type === "preview") {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  imageUrl,
+                  status: "ready" as NodeStatus,
+                },
+              };
+            }
+            return node;
+          })
+        );
+      } catch (error) {
+        console.error("Error generating preview:", error);
+        // Update status to error
+        setNodes((prev) =>
+          prev.map((node) => {
+            if (node.id === nodeId && node.data.type === "preview") {
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  status: "error" as NodeStatus,
+                },
+              };
+            }
+            return node;
+          })
+        );
+      }
+    },
+    [nodes, edges]
+  );
 
   const handleDeleteNode = useCallback((nodeId: string) => {
     // Remove the node
@@ -131,25 +242,13 @@ export function SpriteFlowPage() {
     }
   }, [selectedNodeId]);
 
-  const handlePlay = useCallback((nodeId: string) => {
-    console.log("Playing/Generating preview for node:", nodeId);
-    // TODO: Call backend API to generate preview
-    // For now, just update status
-    setNodes((prev) =>
-      prev.map((node) => {
-        if (node.id === nodeId && node.data.type === "preview") {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              status: "generating" as NodeStatus,
-            },
-          };
-        }
-        return node;
-      })
-    );
-  }, []);
+  const handlePlay = useCallback(
+    async (nodeId: string) => {
+      // Play button triggers the same generation as regenerate
+      await handleRegenerate(nodeId);
+    },
+    [handleRegenerate]
+  );
 
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
