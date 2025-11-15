@@ -13,6 +13,12 @@ const animationLabels: Record<AnimationNodeData["animationKind"], string> = {
 };
 
 export function AnimationNode({ data }: NodeProps<AnimationNodeData>) {
+  const handleDelete = () => {
+    if (data.onDelete) {
+      data.onDelete();
+    }
+  };
+
   return (
     <>
       <Handle type="target" position={Position.Left} />
@@ -20,6 +26,8 @@ export function AnimationNode({ data }: NodeProps<AnimationNodeData>) {
       <SpriteNodeWrapper
         title={animationLabels[data.animationKind]}
         status={data.status}
+        showDelete={true}
+        onDelete={handleDelete}
       >
         <div className="text-sm text-gray-600">
           <p>Animation type: {data.animationKind}</p>

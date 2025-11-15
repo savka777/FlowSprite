@@ -21,10 +21,20 @@ export function ReferenceNode({ id, data }: NodeProps<ReferenceNodeData>) {
     [data]
   );
 
+  const handleDelete = useCallback(() => {
+    if (data.onDelete) {
+      data.onDelete();
+    }
+  }, [data]);
+
   return (
     <>
       <Handle type="source" position={Position.Right} />
-      <SpriteNodeWrapper title="Reference">
+      <SpriteNodeWrapper 
+        title="Reference"
+        showDelete={true}
+        onDelete={handleDelete}
+      >
         <div className="space-y-2">
           <label className="block">
             <input

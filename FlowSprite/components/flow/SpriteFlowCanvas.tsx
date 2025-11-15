@@ -39,6 +39,8 @@ interface SpriteFlowCanvasProps {
   onConnect: (connection: Connection) => void;
   onNodeClick?: (event: React.MouseEvent, node: Node) => void;
   onRegenerate: (nodeId: string) => void;
+  onDeleteNode: (nodeId: string) => void;
+  onPlay: (nodeId: string) => void;
 }
 
 export function SpriteFlowCanvas({
@@ -49,16 +51,19 @@ export function SpriteFlowCanvas({
   onConnect,
   onNodeClick,
   onRegenerate,
+  onDeleteNode,
+  onPlay,
 }: SpriteFlowCanvasProps) {
-  // Update nodes with callbacks (onRegenerate for preview nodes, onUpdate for editable nodes)
+  // Note: nodes already have callbacks from SpriteFlowPage, but we ensure onRegenerate is set
+  // This is a safety measure in case nodes are passed without callbacks
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => {
       const nodeData = { ...node.data };
       
-      // Add onRegenerate for preview and animationPreview nodes
+      // Add onRegenerate for preview and animationPreview nodes if not already set
       if (
-        nodeData.type === "preview" ||
-        nodeData.type === "animationPreview"
+        (nodeData.type === "preview" || nodeData.type === "animationPreview") &&
+        !nodeData.onRegenerate
       ) {
         return {
           ...node,
@@ -119,7 +124,7 @@ export function SpriteFlowCanvas({
 export function getGraphState(nodes: Node[], edges: Edge[]) {
   return {
     nodes: nodes.map((node) => {
-      const { onUpdate, onRegenerate, ...serializableData } = node.data as any;
+      const { onUpdate, onRegenerate, onDelete, onPlay, hasIncomingEdges, isConnectedToPromptOrReference, ...serializableData } = node.data as any;
       return {
         id: node.id,
         type: node.type,

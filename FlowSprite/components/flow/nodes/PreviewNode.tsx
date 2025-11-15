@@ -12,6 +12,20 @@ export function PreviewNode({ id, data }: NodeProps<PreviewNodeData>) {
     }
   };
 
+  const handlePlay = () => {
+    if (data.onPlay) {
+      data.onPlay();
+    }
+  };
+
+  const handleDelete = () => {
+    if (data.onDelete) {
+      data.onDelete();
+    }
+  };
+
+  const shouldShowPlay = data.onPlay && data.isConnectedToPromptOrReference;
+
   return (
     <>
       <Handle type="target" position={Position.Left} />
@@ -21,6 +35,10 @@ export function PreviewNode({ id, data }: NodeProps<PreviewNodeData>) {
         status={data.status}
         showRedo={true}
         onRedo={handleRegenerate}
+        showPlay={shouldShowPlay}
+        onPlay={handlePlay}
+        showDelete={true}
+        onDelete={handleDelete}
       >
         <div className="space-y-2">
           <div className="border border-gray-300 rounded-lg bg-gray-50 aspect-square flex items-center justify-center">

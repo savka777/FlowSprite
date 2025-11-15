@@ -118,6 +118,39 @@ export function SpriteFlowPage() {
     );
   }, []);
 
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    // Remove the node
+    setNodes((prev) => prev.filter((node) => node.id !== nodeId));
+    // Remove all edges connected to this node
+    setEdges((prev) =>
+      prev.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+    );
+    // Clear selection if the deleted node was selected
+    if (selectedNodeId === nodeId) {
+      setSelectedNodeId(null);
+    }
+  }, [selectedNodeId]);
+
+  const handlePlay = useCallback((nodeId: string) => {
+    console.log("Playing/Generating preview for node:", nodeId);
+    // TODO: Call backend API to generate preview
+    // For now, just update status
+    setNodes((prev) =>
+      prev.map((node) => {
+        if (node.id === nodeId && node.data.type === "preview") {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              status: "generating" as NodeStatus,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  }, []);
+
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   }, []);
@@ -137,6 +170,15 @@ export function SpriteFlowPage() {
   // Add update callbacks to nodes that need them
   const nodesWithCallbacks = React.useMemo(() => {
     return nodes.map((node) => {
+      const hasIncomingEdges = edges.some((edge) => edge.target === node.id);
+      const incomingSources = edges
+        .filter((edge) => edge.target === node.id)
+        .map((edge) => edge.source);
+      const connectedNodes = nodes.filter((n) => incomingSources.includes(n.id));
+      const isConnectedToPromptOrReference = connectedNodes.some(
+        (n) => n.data.type === "prompt" || n.data.type === "reference"
+      );
+
       if (node.data.type === "reference") {
         return {
           ...node,
@@ -151,6 +193,7 @@ export function SpriteFlowPage() {
                 )
               );
             },
+            onDelete: () => handleDeleteNode(node.id),
           },
         };
       }
@@ -168,12 +211,51 @@ export function SpriteFlowPage() {
                 )
               );
             },
+            onDelete: () => handleDeleteNode(node.id),
           },
         };
       }
-      return node;
+      if (node.data.type === "preview") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onDelete: () => handleDeleteNode(node.id),
+            onPlay: hasIncomingEdges && isConnectedToPromptOrReference
+              ? () => handlePlay(node.id)
+              : undefined,
+            hasIncomingEdges,
+            isConnectedToPromptOrReference,
+          },
+        };
+      }
+      if (node.data.type === "animation") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onDelete: () => handleDeleteNode(node.id),
+          },
+        };
+      }
+      if (node.data.type === "animationPreview") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onDelete: () => handleDeleteNode(node.id),
+          },
+        };
+      }
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          onDelete: () => handleDeleteNode(node.id),
+        },
+      };
     });
-  }, [nodes, setNodes]);
+  }, [nodes, edges, setNodes, handleDeleteNode, handlePlay]);
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
@@ -264,6 +346,8 @@ export function SpriteFlowPage() {
             onConnect={handleConnect}
             onNodeClick={handleNodeClick}
             onRegenerate={handleRegenerate}
+            onDeleteNode={handleDeleteNode}
+            onPlay={handlePlay}
           />
         </div>
 

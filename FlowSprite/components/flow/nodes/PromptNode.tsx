@@ -15,10 +15,20 @@ export function PromptNode({ id, data }: NodeProps<PromptNodeData>) {
     [data]
   );
 
+  const handleDelete = useCallback(() => {
+    if (data.onDelete) {
+      data.onDelete();
+    }
+  }, [data]);
+
   return (
     <>
       <Handle type="source" position={Position.Right} />
-      <SpriteNodeWrapper title="Prompt">
+      <SpriteNodeWrapper 
+        title="Prompt"
+        showDelete={true}
+        onDelete={handleDelete}
+      >
         <textarea
           placeholder="Enter character description..."
           value={data.prompt}

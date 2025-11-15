@@ -6,12 +6,14 @@ export interface ReferenceNodeData {
   type: 'reference';
   imageUrl?: string;
   onUpdate?: (updates: Partial<ReferenceNodeData>) => void;
+  onDelete?: () => void;
 }
 
 export interface PromptNodeData {
   type: 'prompt';
   prompt: string;
   onUpdate?: (updates: Partial<PromptNodeData>) => void;
+  onDelete?: () => void;
 }
 
 export interface PreviewNodeData {
@@ -19,18 +21,24 @@ export interface PreviewNodeData {
   status: NodeStatus;
   imageUrl?: string;
   onRegenerate?: (nodeId: string) => void;
+  onDelete?: () => void;
+  onPlay?: () => void;
+  hasIncomingEdges?: boolean;
+  isConnectedToPromptOrReference?: boolean;
 }
 
 export interface AnimationNodeData {
   type: 'animation';
   animationKind: AnimationKind;
   status: NodeStatus;
+  onDelete?: () => void;
 }
 
 export interface AnimationPreviewNodeData {
   type: 'animationPreview';
   status: NodeStatus;
   onRegenerate?: (nodeId: string) => void;
+  onDelete?: () => void;
 }
 
 export type SpriteNodeData =

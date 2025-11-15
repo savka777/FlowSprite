@@ -15,6 +15,12 @@ export function AnimationPreviewNode({
     }
   };
 
+  const handleDelete = () => {
+    if (data.onDelete) {
+      data.onDelete();
+    }
+  };
+
   return (
     <>
       <Handle type="target" position={Position.Left} />
@@ -23,6 +29,8 @@ export function AnimationPreviewNode({
         status={data.status}
         showRedo={true}
         onRedo={handleRegenerate}
+        showDelete={true}
+        onDelete={handleDelete}
       >
         <div className="space-y-2">
           <div className="border border-gray-300 rounded-lg bg-gray-50 aspect-video flex items-center justify-center">
