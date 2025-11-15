@@ -4,7 +4,7 @@ import React, { useCallback } from "react";
 import { SpriteFlowCanvas, getGraphState } from "./flow/SpriteFlowCanvas";
 import { Node, Edge, NodeChange, EdgeChange, Connection, addEdge, applyNodeChanges, applyEdgeChanges } from "reactflow";
 import { SpriteNodeData, AnimationKind, NodeStatus } from "@/lib/flowTypes";
-import { ImageIcon, Type, Eye, Film, Video, Scissors, Grid3x3, Gamepad2, X } from "lucide-react";
+import { ImageIcon, Type, Eye, Film, Video, Scissors, Grid3x3, Gamepad2, X, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 const initialNodes: Node<SpriteNodeData>[] = [
   {
@@ -67,6 +67,7 @@ export function SpriteFlowPage() {
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
   const [showDemoGrid, setShowDemoGrid] = React.useState(false);
   const [selectedDemo, setSelectedDemo] = React.useState<Demo | null>(null);
+  const [showInspector, setShowInspector] = React.useState(true);
 
   const handleAddNode = useCallback((type: string, animationKind?: AnimationKind) => {
     const newNodeId = `${type}-${Date.now()}`;
@@ -892,23 +893,48 @@ export function SpriteFlowPage() {
             Flow
           </span>
         </h1>
-        <button
-          onClick={handleExport}
-          className="px-4 py-2 rounded-lg font-medium transition-colors"
-          style={{
-            backgroundColor: '#FFD700',
-            color: '#000000',
-            border: '2px solid #000000',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#FFE44D';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#FFD700';
-          }}
-        >
-          Export
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowInspector(!showInspector)}
+            className="px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+            style={{
+              backgroundColor: showInspector ? '#E5E7EB' : '#F3F4F6',
+              color: '#000000',
+              border: '1px solid #D1D5DB',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#D1D5DB';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = showInspector ? '#E5E7EB' : '#F3F4F6';
+            }}
+            title={showInspector ? "Hide Inspector" : "Show Inspector"}
+          >
+            {showInspector ? (
+              <PanelRightClose className="w-4 h-4" />
+            ) : (
+              <PanelRightOpen className="w-4 h-4" />
+            )}
+            <span className="text-sm">Inspector</span>
+          </button>
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 rounded-lg font-medium transition-colors"
+            style={{
+              backgroundColor: '#FFD700',
+              color: '#000000',
+              border: '2px solid #000000',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFE44D';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFD700';
+            }}
+          >
+            Export
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -1027,37 +1053,39 @@ export function SpriteFlowPage() {
         </div>
 
         {/* Right Sidebar - Inspector */}
-        <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">
-            Inspector
-          </h2>
-          {selectedNode ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Node ID</label>
-                <p className="text-sm font-mono text-gray-900">{selectedNode.id}</p>
+        {showInspector && (
+          <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">
+              Inspector
+            </h2>
+            {selectedNode ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Node ID</label>
+                  <p className="text-sm font-mono text-gray-900">{selectedNode.id}</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Type</label>
+                  <p className="text-sm text-gray-900">{selectedNode.type}</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Position</label>
+                  <p className="text-sm text-gray-900">
+                    ({Math.round(selectedNode.position.x)}, {Math.round(selectedNode.position.y)})
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Data</label>
+                  <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 overflow-auto">
+                    {JSON.stringify(selectedNode.data, null, 2)}
+                  </pre>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Type</label>
-                <p className="text-sm text-gray-900">{selectedNode.type}</p>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Position</label>
-                <p className="text-sm text-gray-900">
-                  ({Math.round(selectedNode.position.x)}, {Math.round(selectedNode.position.y)})
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Data</label>
-                <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 overflow-auto">
-                  {JSON.stringify(selectedNode.data, null, 2)}
-                </pre>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400">Select a node to inspect</p>
-          )}
-        </div>
+            ) : (
+              <p className="text-sm text-gray-400">Select a node to inspect</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Demo Grid Modal */}
