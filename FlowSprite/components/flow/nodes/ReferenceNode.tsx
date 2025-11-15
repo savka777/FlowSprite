@@ -56,6 +56,7 @@ export function ReferenceNode({ id, data }: NodeProps<ReferenceNodeData>) {
         title="Reference"
         showDelete={true}
         onDelete={handleDelete}
+        borderColor="#4C97FF" // Scratch blue
       >
         <div className="space-y-2">
           <label className="block">

@@ -4,6 +4,7 @@ import React, { useCallback } from "react";
 import { SpriteFlowCanvas, getGraphState } from "./flow/SpriteFlowCanvas";
 import { Node, Edge, NodeChange, EdgeChange, Connection, addEdge, applyNodeChanges, applyEdgeChanges } from "reactflow";
 import { SpriteNodeData, AnimationKind, NodeStatus } from "@/lib/flowTypes";
+import { ImageIcon, Type, Eye, Film, Video } from "lucide-react";
 
 const initialNodes: Node<SpriteNodeData>[] = [
   {
@@ -619,10 +620,32 @@ export function SpriteFlowPage() {
     <div className="h-screen w-screen flex flex-col bg-gray-50">
       {/* Top Bar */}
       <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900">SpriteFlow</h1>
+        <h1 className="text-3xl font-bold text-gray-900">
+          Sprite<span 
+            style={{
+              fontFamily: 'var(--font-pacifico), cursive',
+              color: '#FFD700',
+              WebkitTextStroke: '0.3px black',
+              textShadow: '0.5px 0.5px 0px black',
+            }}
+          >
+            Flow
+          </span>
+        </h1>
         <button
           onClick={handleExport}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          className="px-4 py-2 rounded-lg font-medium transition-colors"
+          style={{
+            backgroundColor: '#FFD700',
+            color: '#000000',
+            border: '2px solid #000000',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#FFE44D';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#FFD700';
+          }}
         >
           Export
         </button>
@@ -638,54 +661,62 @@ export function SpriteFlowPage() {
           <div className="space-y-2">
             <button
               onClick={() => handleAddNode("reference")}
-              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium"
+              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
             >
+              <ImageIcon className="w-4 h-4" />
               Reference
             </button>
             <button
               onClick={() => handleAddNode("prompt")}
-              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium"
+              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
             >
+              <Type className="w-4 h-4" />
               Prompt
             </button>
             <button
               onClick={() => handleAddNode("preview")}
-              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium"
+              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
             >
+              <Eye className="w-4 h-4" />
               Preview
             </button>
             <div className="pt-2 border-t border-gray-200 mt-2">
               <p className="text-xs text-gray-500 mb-2 px-2">Animations</p>
               <button
                 onClick={() => handleAddNode("animation", "idle")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2"
+                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
               >
+                <Film className="w-4 h-4" />
                 Idle Animation
               </button>
               <button
                 onClick={() => handleAddNode("animation", "walk")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2"
+                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
               >
+                <Film className="w-4 h-4" />
                 Walk Animation
               </button>
               <button
                 onClick={() => handleAddNode("animation", "run")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2"
+                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
               >
+                <Film className="w-4 h-4" />
                 Run Animation
               </button>
               <button
                 onClick={() => handleAddNode("animation", "jump")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2"
+                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
               >
+                <Film className="w-4 h-4" />
                 Jump Animation
               </button>
             </div>
             <div className="pt-2 border-t border-gray-200 mt-2">
               <button
                 onClick={() => handleAddNode("animationPreview")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
               >
+                <Video className="w-4 h-4" />
                 Animation Preview
               </button>
             </div>

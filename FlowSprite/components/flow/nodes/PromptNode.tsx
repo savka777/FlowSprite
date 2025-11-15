@@ -28,6 +28,7 @@ export function PromptNode({ id, data }: NodeProps<PromptNodeData>) {
         title="Prompt"
         showDelete={true}
         onDelete={handleDelete}
+        borderColor="#4CBF4F" // Scratch green
       >
         <textarea
           placeholder="Enter character description..."

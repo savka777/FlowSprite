@@ -40,9 +40,10 @@ export function PreviewNode({ id, data }: NodeProps<PreviewNodeData>) {
         onPlay={handlePlay}
         showDelete={true}
         onDelete={handleDelete}
+        borderColor="#9966FF" // Scratch purple
       >
         <div className="space-y-2">
-          <div className="border border-gray-300 rounded-lg bg-white flex items-center justify-center w-full h-36">
+          <div className="border border-gray-300 rounded-lg bg-white flex items-center justify-center w-full h-48">
             {data.status === "generating" ? (
               <div className="flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />

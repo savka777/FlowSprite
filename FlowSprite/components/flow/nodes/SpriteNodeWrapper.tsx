@@ -13,6 +13,7 @@ interface SpriteNodeWrapperProps {
   onDelete?: () => void;
   showPlay?: boolean;
   onPlay?: () => void;
+  borderColor?: string; // Scratch-style border color
   children: React.ReactNode;
 }
 
@@ -32,10 +33,17 @@ export function SpriteNodeWrapper({
   onDelete,
   showPlay = false,
   onPlay,
+  borderColor = "#E5E7EB", // Default gray
   children,
 }: SpriteNodeWrapperProps) {
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 min-w-[200px]">
+    <div 
+      className="bg-white rounded-2xl shadow-lg p-4 min-w-[200px]"
+      style={{
+        border: `3px solid ${borderColor}`,
+        boxShadow: `0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 0 0 1px ${borderColor}`,
+      }}
+    >
       {/* Header with title, status, and action buttons */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-800">{title}</h3>

@@ -50,9 +50,10 @@ export function AnimationPreviewNode({
         onRedo={handleRegenerate}
         showDelete={true}
         onDelete={handleDelete}
+        borderColor="#FF6680" // Scratch pink
       >
         <div className="space-y-2">
-          <div className="border border-gray-300 rounded-lg bg-white aspect-video flex items-center justify-center overflow-hidden">
+          <div className="border border-gray-300 rounded-lg bg-white w-full h-40 flex items-center justify-center overflow-hidden">
             {data.status === "generating" ? (
               <div className="flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />

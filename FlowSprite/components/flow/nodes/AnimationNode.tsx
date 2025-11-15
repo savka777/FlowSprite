@@ -55,6 +55,7 @@ export function AnimationNode({
         onPlay={handlePlay}
         showDelete={true}
         onDelete={handleDelete}
+        borderColor="#FF8C1A" // Scratch orange
       >
         <div className="space-y-2">
           <div className="text-sm text-gray-600">
