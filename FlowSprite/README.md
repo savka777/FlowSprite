@@ -6,6 +6,11 @@ A powerful node-based visual editor for creating AI-generated 2D sprites and ani
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript)
 ![Gemini](https://img.shields.io/badge/Google%20Gemini-2.5-orange?style=flat-square)
 
+## 🏆 Hackathon Win
+
+SpriteFlow was built for the **[Gemini Vibe Code Hackathon – London](https://cerebralvalley.ai/e/vibe-code-gemini-london)** and **took 1st place**, winning **$50,000 in Gemini API credits** from Google.  
+This project started as a rapid prototype in Google AI Studio and grew into a full end-to-end AI-powered sprite and animation pipeline.
+
 ## 🎯 What is SpriteFlow?
 
 SpriteFlow is a visual workflow editor that leverages **Google Gemini AI** to generate 2D pixel art sprites and animations for game development. Instead of manually drawing sprites, you can:
