@@ -7,7 +7,6 @@ import ReactFlow, {
   Connection,
   addEdge,
   Background,
-  Controls,
   MiniMap,
   NodeTypes,
   NodeChange,
@@ -63,7 +62,7 @@ export function SpriteFlowCanvas({
   const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => {
       const nodeData = { ...node.data };
-      
+
       // Add onRegenerate for preview and animationPreview nodes if not already set
       if (
         (nodeData.type === "preview" || nodeData.type === "animationPreview") &&
@@ -77,7 +76,7 @@ export function SpriteFlowCanvas({
           },
         };
       }
-      
+
       return node;
     });
   }, [nodes, onRegenerate]);
@@ -116,8 +115,7 @@ export function SpriteFlowCanvas({
         fitView
       >
         <Background />
-        <Controls />
-        <MiniMap 
+        <MiniMap
           style={{
             width: 120,
             height: 80,

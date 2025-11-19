@@ -87,7 +87,7 @@ export function AnimationPreviewNode({
               </span>
             )}
           </div>
-          
+
           {/* Generate button - show when connected to Animation node but no video yet */}
           {canGenerate && !hasVideo && (
             <button
@@ -95,7 +95,7 @@ export function AnimationPreviewNode({
                 e.stopPropagation();
                 handleGenerate();
               }}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors"
             >
               <Play className="w-4 h-4" />
               <span>Generate Video</span>

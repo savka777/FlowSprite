@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Pacifico } from "next/font/google";
+import { Inter, Pacifico, Outfit } from "next/font/google";
 
+const inter = Inter({ subsets: ["latin"] });
 const pacifico = Pacifico({
   subsets: ["latin"],
   weight: ["400"],
   variable: "--font-pacifico",
+});
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
 });
 
 export const metadata: Metadata = {
@@ -20,8 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={pacifico.variable}>{children}</body>
+      <body className={`${inter.className} ${pacifico.variable} ${outfit.variable}`}>{children}</body>
     </html>
   );
 }
-

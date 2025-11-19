@@ -4,7 +4,8 @@ import React, { useCallback } from "react";
 import { SpriteFlowCanvas, getGraphState } from "./flow/SpriteFlowCanvas";
 import { Node, Edge, NodeChange, EdgeChange, Connection, addEdge, applyNodeChanges, applyEdgeChanges } from "reactflow";
 import { SpriteNodeData, AnimationKind, NodeStatus } from "@/lib/flowTypes";
-import { ImageIcon, Type, Eye, Film, Video, Scissors, Grid3x3, Gamepad2, X, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ImageIcon, Type, Eye, Film, Video, Scissors, Grid3x3, Gamepad2, X, PanelRightClose, PanelRightOpen, ArrowRight, Footprints, Zap, ArrowUp, Timer } from "lucide-react";
 
 const initialNodes: Node<SpriteNodeData>[] = [
   {
@@ -16,14 +17,7 @@ const initialNodes: Node<SpriteNodeData>[] = [
       prompt: "A cute pixel art character",
     },
   },
-  {
-    id: "reference-1",
-    type: "reference",
-    position: { x: 100, y: 250 },
-    data: {
-      type: "reference",
-    },
-  },
+
   {
     id: "preview-1",
     type: "preview",
@@ -50,6 +44,8 @@ interface Demo {
   description: string;
   htmlPath: string;
   thumbnail?: string;
+  nodes?: Node<SpriteNodeData>[];
+  edges?: Edge[];
 }
 
 const demos: Demo[] = [
@@ -68,6 +64,7 @@ export function SpriteFlowPage() {
   const [showDemoGrid, setShowDemoGrid] = React.useState(false);
   const [selectedDemo, setSelectedDemo] = React.useState<Demo | null>(null);
   const [showInspector, setShowInspector] = React.useState(true);
+  const [showGameViewer, setShowGameViewer] = React.useState(false);
 
   const handleAddNode = useCallback((type: string, animationKind?: AnimationKind) => {
     const newNodeId = `${type}-${Date.now()}`;
@@ -143,16 +140,16 @@ export function SpriteFlowPage() {
                 const mimeType = base64Match[1];
                 const base64 = base64Match[2];
                 const extension = mimeType.includes("png") ? "png" : mimeType.includes("jpeg") ? "jpg" : "png";
-                const filename = previewNodes.length === 1 
-                  ? `sprite.${extension}` 
+                const filename = previewNodes.length === 1
+                  ? `sprite.${extension}`
                   : `sprite_${index + 1}.${extension}`;
-                
+
                 const byteCharacters = atob(base64);
                 const byteNumbers = new Array(byteCharacters.length)
                   .fill(0)
                   .map((_, i) => byteCharacters.charCodeAt(i));
                 const byteArray = new Uint8Array(byteNumbers);
-                
+
                 characterFolder.file(filename, byteArray);
                 hasContent = true;
               }
@@ -306,13 +303,13 @@ export function SpriteFlowPage() {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
           const errorMessage = errorData.error || `HTTP ${response.status}`;
-          
+
           // Log quota errors for debugging
           if (response.status === 429) {
             console.error("Quota exceeded:", errorMessage);
             console.warn("You may need to upgrade your Gemini API plan or wait for quota reset.");
           }
-          
+
           throw new Error(errorMessage);
         }
 
@@ -525,7 +522,7 @@ export function SpriteFlowPage() {
                   videoBase64,
                   mimeType: mimeType || "video/mp4",
                   status: "ready" as NodeStatus,
-                  animationKind: animationNode.data.animationKind,
+                  animationKind: (animationNode.data as any).animationKind,
                 },
               };
             }
@@ -586,13 +583,13 @@ export function SpriteFlowPage() {
         prev.map((node) =>
           node.id === nodeId && node.type === "cut"
             ? {
-                ...node,
-                data: {
-                  ...(node.data as any),
-                  status: "cutting" as NodeStatus,
-                  errorMessage: undefined,
-                },
-              }
+              ...node,
+              data: {
+                ...(node.data as any),
+                status: "cutting" as NodeStatus,
+                errorMessage: undefined,
+              },
+            }
             : node
         )
       );
@@ -603,12 +600,12 @@ export function SpriteFlowPage() {
       // Find connected animation node or animationPreview node
       const incoming = edges.filter((e) => e.target === nodeId);
       const sourceIds = incoming.map((e) => e.source);
-      
+
       // Try to find Animation node first
       let sourceNode = nodes.find(
         (n) => sourceIds.includes(n.id) && n.data.type === "animation"
       );
-      
+
       // If not found, try AnimationPreview node
       if (!sourceNode) {
         sourceNode = nodes.find(
@@ -631,13 +628,13 @@ export function SpriteFlowPage() {
           prev.map((node) =>
             node.id === nodeId
               ? {
-                  ...node,
-                  data: {
-                    ...(node.data as any),
-                    status: "error" as NodeStatus,
-                    errorMessage: "No animation video connected.",
-                  },
-                }
+                ...node,
+                data: {
+                  ...(node.data as any),
+                  status: "error" as NodeStatus,
+                  errorMessage: "No animation video connected.",
+                },
+              }
               : node
           )
         );
@@ -693,13 +690,13 @@ export function SpriteFlowPage() {
           prev.map((node) =>
             node.id === nodeId && node.type === "cut"
               ? {
-                  ...node,
-                  data: {
-                    ...(node.data as any),
-                    status: "error" as NodeStatus,
-                    errorMessage: err?.message || "Failed to cut frames",
-                  },
-                }
+                ...node,
+                data: {
+                  ...(node.data as any),
+                  status: "error" as NodeStatus,
+                  errorMessage: err?.message || "Failed to cut frames",
+                },
+              }
               : node
           )
         );
@@ -733,8 +730,8 @@ export function SpriteFlowPage() {
         .map((edge) => edge.source);
       const connectedNodes = nodes.filter((n) => incomingSources.includes(n.id));
       const isConnectedToPromptOrReference = connectedNodes.some(
-        (n) => n.data.type === "prompt" || n.data.type === "reference" || 
-              (n.data.type === "preview" && n.data.imageUrl) // Preview nodes with generated images
+        (n) => n.data.type === "prompt" || n.data.type === "reference" ||
+          (n.data.type === "preview" && n.data.imageUrl) // Preview nodes with generated images
       );
 
       if (node.data.type === "reference") {
@@ -746,7 +743,7 @@ export function SpriteFlowPage() {
               setNodes((nds) =>
                 nds.map((n) =>
                   n.id === node.id
-                    ? { ...n, data: { ...n.data, ...updates } }
+                    ? { ...n, data: { ...n.data as any, ...updates } }
                     : n
                 )
               );
@@ -764,7 +761,7 @@ export function SpriteFlowPage() {
               setNodes((nds) =>
                 nds.map((n) =>
                   n.id === node.id
-                    ? { ...n, data: { ...n.data, ...updates } }
+                    ? { ...n, data: { ...n.data as any, ...updates } }
                     : n
                 )
               );
@@ -806,7 +803,7 @@ export function SpriteFlowPage() {
               setNodes((nds) =>
                 nds.map((n) =>
                   n.id === node.id
-                    ? { ...n, data: { ...n.data, ...updates } }
+                    ? { ...n, data: { ...n.data as any, ...updates } }
                     : n
                 )
               );
@@ -829,7 +826,7 @@ export function SpriteFlowPage() {
           (n) =>
             sourceNodeIds.includes(n.id) &&
             n.data.type === "animation" &&
-            n.data.animationKind
+            (n.data as any).animationKind
         );
 
         return {
@@ -868,7 +865,7 @@ export function SpriteFlowPage() {
       return {
         ...node,
         data: {
-          ...node.data,
+          ...(node.data as any),
           onDelete: () => handleDeleteNode(node.id),
         },
       };
@@ -880,33 +877,22 @@ export function SpriteFlowPage() {
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-50">
       {/* Top Bar */}
-      <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Sprite<span 
-            style={{
-              fontFamily: 'var(--font-pacifico), cursive',
-              color: '#FFD700',
-              WebkitTextStroke: '0.3px black',
-              textShadow: '0.5px 0.5px 0px black',
-            }}
-          >
-            Flow
-          </span>
-        </h1>
+      <div className="h-16 bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm transform rotate-3">
+            <span className="text-white font-bold text-xl" style={{ fontFamily: 'var(--font-outfit)' }}>S</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight" style={{ fontFamily: 'var(--font-outfit)' }}>
+            Sprite<span className="text-green-600">Flow</span>
+          </h1>
+        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowInspector(!showInspector)}
-            className="px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+            className="px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-2 border border-gray-200 hover:border-green-400 hover:text-green-600"
             style={{
-              backgroundColor: showInspector ? '#E5E7EB' : '#F3F4F6',
-              color: '#000000',
-              border: '1px solid #D1D5DB',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#D1D5DB';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = showInspector ? '#E5E7EB' : '#F3F4F6';
+              backgroundColor: showInspector ? '#f0fdf4' : 'white',
+              color: showInspector ? '#16a34a' : '#374151',
             }}
             title={showInspector ? "Hide Inspector" : "Show Inspector"}
           >
@@ -919,18 +905,7 @@ export function SpriteFlowPage() {
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-2 rounded-lg font-medium transition-colors"
-            style={{
-              backgroundColor: '#FFD700',
-              color: '#000000',
-              border: '2px solid #000000',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#FFE44D';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#FFD700';
-            }}
+            className="px-4 py-2 rounded-lg font-medium transition-all shadow-sm hover:shadow-md flex items-center gap-2 bg-green-500 text-white hover:bg-green-600"
           >
             Export
           </button>
@@ -938,107 +913,15 @@ export function SpriteFlowPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Node Palette */}
-        <div className="w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">
-            Node Palette
-          </h2>
-          <div className="space-y-2">
-            <button
-              onClick={() => handleAddNode("reference")}
-              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
-            >
-              <ImageIcon className="w-4 h-4" />
-              Reference
-            </button>
-            <button
-              onClick={() => handleAddNode("prompt")}
-              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
-            >
-              <Type className="w-4 h-4" />
-              Prompt
-            </button>
-            <button
-              onClick={() => handleAddNode("preview")}
-              className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
-            >
-              <Eye className="w-4 h-4" />
-              Preview
-            </button>
-            <div className="pt-2 border-t border-gray-200 mt-2">
-              <p className="text-xs text-gray-500 mb-2 px-2">Animations</p>
-              <button
-                onClick={() => handleAddNode("animation", "idle")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
-              >
-                <Film className="w-4 h-4" />
-                Idle Animation
-              </button>
-              <button
-                onClick={() => handleAddNode("animation", "walk")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
-              >
-                <Film className="w-4 h-4" />
-                Walk Animation
-              </button>
-              <button
-                onClick={() => handleAddNode("animation", "run")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
-              >
-                <Film className="w-4 h-4" />
-                Run Animation
-              </button>
-              <button
-                onClick={() => handleAddNode("animation", "jump")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
-              >
-                <Film className="w-4 h-4" />
-                Jump Animation
-              </button>
-            </div>
-            <div className="pt-2 border-t border-gray-200 mt-2">
-              <button
-                onClick={() => handleAddNode("animationPreview")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
-              >
-                <Video className="w-4 h-4" />
-                Animation Preview
-              </button>
-            </div>
-            <div className="pt-2 border-t border-gray-200 mt-2">
-              <p className="text-xs text-gray-500 mb-2 px-2">Frame Extraction</p>
-              <button
-                onClick={() => handleAddNode("cut")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium mb-2 flex items-center gap-2"
-              >
-                <Scissors className="w-4 h-4" />
-                Cut to Sprites
-              </button>
-              <button
-                onClick={() => handleAddNode("spriteFramesPreview")}
-                className="w-full text-left px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
-              >
-                <Grid3x3 className="w-4 h-4" />
-                Sprite Frames Preview
-              </button>
-            </div>
-            
-            {/* Community Demo Button at Bottom */}
-            <div className="pt-4 border-t border-gray-200 mt-4">
-              <button
-                onClick={() => setShowDemoGrid(true)}
-                className="w-full text-left px-4 py-2 rounded-lg border-2 border-yellow-400 bg-yellow-400 hover:bg-yellow-500 transition-colors text-sm font-medium flex items-center gap-2 text-black"
-              >
-                <Gamepad2 className="w-4 h-4" />
-                Community Demo
-              </button>
-            </div>
-          </div>
-        </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="flex-1 flex overflow-hidden relative"
+      >
 
-        {/* Center - Canvas */}
-        <div className="flex-1 relative">
+        {/* Canvas Background */}
+        <div className="absolute inset-0 z-0">
           <SpriteFlowCanvas
             nodes={nodesWithCallbacks}
             edges={edges}
@@ -1052,112 +935,293 @@ export function SpriteFlowPage() {
           />
         </div>
 
-        {/* Right Sidebar - Inspector */}
-        {showInspector && (
-          <div className="w-80 bg-white border-l border-gray-200 p-4 overflow-y-auto">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">
-              Inspector
+        {/* Left Sidebar - Node Palette (Floating) */}
+        <div className="w-64 m-4 z-10 flex flex-col pointer-events-none">
+          {/* We use pointer-events-none on the container so clicks pass through to canvas in empty spaces, 
+              but we need to re-enable pointer-events on the actual sidebar card */}
+          <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-gray-100 p-4 overflow-y-auto pointer-events-auto max-h-[calc(100vh-6rem)]">
+            <h2 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">
+              Node Palette
             </h2>
-            {selectedNode ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Node ID</label>
-                  <p className="text-sm font-mono text-gray-900">{selectedNode.id}</p>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Type</label>
-                  <p className="text-sm text-gray-900">{selectedNode.type}</p>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Position</label>
-                  <p className="text-sm text-gray-900">
-                    ({Math.round(selectedNode.position.x)}, {Math.round(selectedNode.position.y)})
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Data</label>
-                  <pre className="text-xs bg-gray-50 p-2 rounded border border-gray-200 overflow-auto">
-                    {JSON.stringify(selectedNode.data, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Select a node to inspect</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Demo Grid Modal */}
-      {showDemoGrid && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Community Demos</h2>
-              <button
-                onClick={() => setShowDemoGrid(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+            <div className="space-y-2">
+              <motion.button
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleAddNode("reference")}
+                className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group"
               >
-                <X className="w-6 h-6" />
-              </button>
+                <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                  <ImageIcon className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                </div>
+                Reference Image
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleAddNode("prompt")}
+                className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group"
+              >
+                <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                  <Type className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                </div>
+                Text Prompt
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleAddNode("preview")}
+                className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group"
+              >
+                <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                  <Eye className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                </div>
+                Preview
+              </motion.button>
+
+              <div className="pt-2 mt-2 border-t border-gray-50">
+                <p className="text-[10px] font-bold text-gray-400 mb-2 px-2 uppercase tracking-wider">Animation</p>
+                <motion.button
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAddNode("animation", "idle")}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group mb-2"
+                >
+                  <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                    <Timer className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                  </div>
+                  Idle Animation
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAddNode("animation", "walk")}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group mb-2"
+                >
+                  <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                    <Footprints className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                  </div>
+                  Walk Animation
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAddNode("animation", "run")}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group mb-2"
+                >
+                  <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                    <Zap className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                  </div>
+                  Run Animation
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAddNode("animation", "jump")}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group mb-2"
+                >
+                  <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                    <ArrowUp className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                  </div>
+                  Jump Animation
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAddNode("animationPreview")}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group"
+                >
+                  <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                    <Video className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                  </div>
+                  Animation Preview
+                </motion.button>
+              </div>
+
+              <div className="pt-2 mt-2 border-t border-gray-50">
+                <p className="text-[10px] font-bold text-gray-400 mb-2 px-2 uppercase tracking-wider">Frame Extraction</p>
+                <motion.button
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAddNode("cut")}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium mb-2 flex items-center gap-3 text-gray-700 hover:text-green-700 group"
+                >
+                  <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                    <Scissors className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                  </div>
+                  Cut to Sprites
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleAddNode("spriteFramesPreview")}
+                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all text-sm font-medium flex items-center gap-3 text-gray-700 hover:text-green-700 group"
+                >
+                  <div className="p-1.5 bg-gray-100 rounded-md group-hover:bg-green-100 transition-colors">
+                    <Grid3x3 className="w-4 h-4 text-gray-500 group-hover:text-green-600" />
+                  </div>
+                  Frames Preview
+                </motion.button>
+              </div>
+
+              {/* Community Demo Button at Bottom */}
+              <div className="pt-4 mt-4 border-t border-gray-100">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowDemoGrid(true)}
+                  className="w-full text-left px-4 py-3 rounded-lg bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 text-white shadow-md hover:shadow-lg transition-all text-sm font-medium flex items-center gap-3"
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                  Community Demo
+                </motion.button>
+              </div>
             </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {demos.map((demo) => (
-                  <div
-                    key={demo.id}
-                    onClick={() => {
-                      setSelectedDemo(demo);
-                      setShowDemoGrid(false);
-                    }}
-                    className="border-2 border-gray-200 rounded-lg p-4 hover:border-yellow-400 hover:shadow-lg transition-all cursor-pointer bg-white"
-                  >
-                    <div className="aspect-video bg-gray-100 rounded mb-3 flex items-center justify-center">
-                      {demo.thumbnail ? (
+          </div>
+        </div>
+
+        {/* Right Sidebar - Inspector (Floating) */}
+        <AnimatePresence mode="wait">
+          {showInspector && (
+            <motion.div
+              initial={{ x: 320, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 320, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="absolute right-4 top-4 bottom-4 w-80 z-10 pointer-events-none flex flex-col"
+            >
+              <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-gray-100 p-4 overflow-y-auto pointer-events-auto h-full">
+                <h2 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">
+                  Inspector
+                </h2>
+                {selectedNode ? (
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Node ID</label>
+                      <p className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded border border-gray-100">{selectedNode.id}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Type</label>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {selectedNode.type}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Position</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-gray-50 px-2 py-1 rounded border border-gray-100 text-sm text-gray-600">
+                          X: {Math.round(selectedNode.position.x)}
+                        </div>
+                        <div className="bg-gray-50 px-2 py-1 rounded border border-gray-100 text-sm text-gray-600">
+                          Y: {Math.round(selectedNode.position.y)}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Data</label>
+                      <pre className="text-xs bg-gray-900 text-gray-100 p-3 rounded-lg overflow-auto max-h-60 font-mono">
+                        {JSON.stringify(selectedNode.data, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-4 text-gray-400">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                      <Eye className="w-6 h-6 text-gray-300" />
+                    </div>
+                    <p className="text-sm">Select a node to inspect its properties</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Demo Grid Modal */}
+        {showDemoGrid && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Gamepad2 className="w-5 h-5 text-green-600" />
+                  Community Demos
+                </h2>
+                <button
+                  onClick={() => setShowDemoGrid(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-gray-900"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto bg-gray-50/30">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {demos.map((demo) => (
+                    <button
+                      key={demo.id}
+                      onClick={() => {
+                        if ((demo as any).nodes && (demo as any).edges) {
+                          setNodes((demo as any).nodes);
+                          setEdges((demo as any).edges);
+                        }
+                        setShowDemoGrid(false);
+                      }}
+                      className="group relative bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 text-left border border-gray-100 hover:border-green-200"
+                    >
+                      <div className="aspect-video bg-gray-100 relative overflow-hidden">
                         <img
                           src={demo.thumbnail}
                           alt={demo.name}
-                          className="w-full h-full object-cover rounded"
+                          className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
                         />
-                      ) : (
-                        <Gamepad2 className="w-12 h-12 text-gray-400" />
-                      )}
-                    </div>
-                    <h3 className="font-semibold text-gray-900 mb-1">{demo.name}</h3>
-                    <p className="text-sm text-gray-600">{demo.description}</p>
-                  </div>
-                ))}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+                          <span className="text-white font-medium text-sm flex items-center gap-2">
+                            Load Demo <ArrowRight className="w-4 h-4" />
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-bold text-gray-900 mb-1 group-hover:text-green-600 transition-colors">{demo.name}</h3>
+                        <p className="text-sm text-gray-500 line-clamp-2">{demo.description}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Game Viewer Modal */}
-      {selectedDemo && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
-          <div className="w-full h-full flex flex-col">
-            <div className="bg-gray-900 px-6 py-4 flex items-center justify-between border-b border-gray-700">
-              <h2 className="text-xl font-bold text-white">{selectedDemo.name}</h2>
-              <button
-                onClick={() => setSelectedDemo(null)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="flex-1 relative">
-              <iframe
-                src={selectedDemo.htmlPath}
-                className="w-full h-full border-0"
-                title={selectedDemo.name}
-                allow="fullscreen"
-              />
+        {/* Game Viewer Modal */}
+        {showGameViewer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-900 text-white">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Gamepad2 className="w-5 h-5 text-green-400" />
+                  Game Preview
+                </h2>
+                <button
+                  onClick={() => setShowGameViewer(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 bg-black relative">
+                <iframe
+                  src="/game-viewer.html" // You would need to implement this
+                  className="w-full h-full border-0"
+                  title="Game Viewer"
+                />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <p className="text-gray-500 font-mono">Game Viewer Placeholder</p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+      </motion.div>
+    </div >
   );
 }
-
