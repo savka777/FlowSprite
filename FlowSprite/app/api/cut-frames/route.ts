@@ -24,22 +24,22 @@ function getFfmpegPath(): string | null {
 
   // Try alternative paths - ffmpeg-static exports the path, but Next.js might bundle it differently
   const cwd = process.cwd();
-  
+
   // Get the platform-specific executable name
   const isWindows = process.platform === "win32";
   const exeName = isWindows ? "ffmpeg.exe" : "ffmpeg";
-  
+
   const possiblePaths = [
     // Try in node_modules/ffmpeg-static directly (check common locations)
     path.join(cwd, "node_modules", "ffmpeg-static", exeName),
     // Try the path from ffmpeg-static but relative to cwd if it's relative
-    path.isAbsolute(ffmpegStatic) 
-      ? ffmpegStatic 
+    path.isAbsolute(ffmpegStatic)
+      ? ffmpegStatic
       : path.join(cwd, ffmpegStatic),
     // Try .bin directory
     path.join(cwd, "node_modules", ".bin", exeName),
     // Try to find it by searching the ffmpeg-static package
-    ...(function() {
+    ...(function () {
       try {
         // Try to resolve the package location
         const packagePath = require.resolve("ffmpeg-static/package.json");
@@ -104,9 +104,9 @@ export async function POST(request: NextRequest) {
     if (!ffmpegPath) {
       console.error("FFmpeg binary not found");
       return NextResponse.json(
-        { 
-          nodeId, 
-          error: "FFmpeg not available. Please ensure ffmpeg-static is properly installed. Try running: npm install ffmpeg-static" 
+        {
+          nodeId,
+          error: "FFmpeg not available. Please ensure ffmpeg-static is properly installed. Try running: npm install ffmpeg-static"
         },
         { status: 500 }
       );
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     // Create temporary directory
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cut-frames-"));
     const inputPath = path.join(tmpDir, "input.mp4");
-    
+
     // Decode base64 and write video file
     const buf = Buffer.from(videoBase64, "base64");
     await fs.writeFile(inputPath, buf);
@@ -150,7 +150,42 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < frameFiles.length; i++) {
       const filename = frameFiles[i];
       const framePath = path.join(tmpDir, filename);
-      const fileBytes = await fs.readFile(framePath);
+      let fileBytes = await fs.readFile(framePath);
+
+      // Remove background using remove.bg API
+      const apiKey = process.env.REMOVEBG_API_KEY;
+      if (apiKey) {
+        try {
+          console.log(`[Frame ${i + 1}/${frameFiles.length}] Removing background via remove.bg...`);
+
+          const FormData = (await import('form-data')).default;
+          const formData = new FormData();
+          formData.append('image_file_b64', fileBytes.toString('base64'));
+          formData.append('size', 'auto');
+
+          const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+            method: 'POST',
+            headers: {
+              'X-Api-Key': apiKey,
+            },
+            body: formData as any,
+          });
+
+          if (response.ok) {
+            const resultBuffer = await response.arrayBuffer();
+            fileBytes = Buffer.from(resultBuffer);
+            console.log(`[Frame ${i + 1}/${frameFiles.length}] Background removed successfully!`);
+          } else {
+            const error = await response.text();
+            console.warn(`[Frame ${i + 1}/${frameFiles.length}] Remove.bg failed:`, error);
+          }
+        } catch (err) {
+          console.error(`[Frame ${i + 1}/${frameFiles.length}] Remove.bg error:`, err);
+        }
+      } else {
+        console.warn('REMOVEBG_API_KEY not set, skipping background removal');
+      }
+
       const base64 = fileBytes.toString("base64");
       frames.push({ index: i, filename, base64 });
       zip.file(filename, fileBytes);

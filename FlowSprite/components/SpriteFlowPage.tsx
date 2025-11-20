@@ -115,6 +115,41 @@ export function SpriteFlowPage() {
     setNodes((prev) => [...prev, newNode]);
   }, []);
 
+  const handleSaveWorkflow = useCallback(() => {
+    try {
+      const workflowState = {
+        nodes,
+        edges,
+        timestamp: new Date().toISOString(),
+      };
+      const serialized = JSON.stringify(workflowState);
+      localStorage.setItem('flowsprite_dev_workflow', serialized);
+      console.log('Workflow saved:', serialized.length, 'bytes');
+      alert('Workflow saved successfully!');
+    } catch (err) {
+      console.error('Save failed:', err);
+      alert('Failed to save workflow: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  }, [nodes, edges]);
+
+  const handleLoadWorkflow = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('flowsprite_dev_workflow');
+      if (!saved) {
+        alert('No saved workflow found!');
+        return;
+      }
+      console.log('Loading workflow:', saved.length, 'bytes');
+      const { nodes: savedNodes, edges: savedEdges } = JSON.parse(saved);
+      setNodes(savedNodes);
+      setEdges(savedEdges);
+      alert('Workflow loaded successfully!');
+    } catch (err) {
+      console.error('Load failed:', err);
+      alert('Failed to load workflow: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  }, []);
+
   const handleExport = useCallback(async () => {
     try {
       // Import JSZip dynamically (it's a large library)
@@ -131,18 +166,38 @@ export function SpriteFlowPage() {
       if (previewNodes.length > 0) {
         const characterFolder = zip.folder("character");
         if (characterFolder) {
-          previewNodes.forEach((node, index) => {
+          for (let index = 0; index < previewNodes.length; index++) {
+            const node = previewNodes[index];
             if (node.data.type === "preview" && node.data.imageUrl) {
               // Extract base64 from data URL
               const dataUrl = node.data.imageUrl;
               const base64Match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
               if (base64Match) {
                 const mimeType = base64Match[1];
-                const base64 = base64Match[2];
+                let base64 = base64Match[2];
                 const extension = mimeType.includes("png") ? "png" : mimeType.includes("jpeg") ? "jpg" : "png";
                 const filename = previewNodes.length === 1
                   ? `sprite.${extension}`
                   : `sprite_${index + 1}.${extension}`;
+
+                // Remove background via remove.bg API
+                try {
+                  const response = await fetch('/api/remove-bg', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imageBase64: base64 }),
+                  });
+
+                  if (response.ok) {
+                    const result = await response.json();
+                    base64 = result.imageBase64;
+                    console.log(`Background removed from sprite ${index + 1}`);
+                  } else {
+                    console.warn(`Background removal failed for sprite ${index + 1}, using original`);
+                  }
+                } catch (err) {
+                  console.error(`Error removing background from sprite ${index + 1}:`, err);
+                }
 
                 const byteCharacters = atob(base64);
                 const byteNumbers = new Array(byteCharacters.length)
@@ -154,7 +209,7 @@ export function SpriteFlowPage() {
                 hasContent = true;
               }
             }
-          });
+          }
         }
       }
 
